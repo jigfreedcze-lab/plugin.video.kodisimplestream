@@ -138,3 +138,27 @@ msgstr "Webshare nevrátil odkaz ke stažení"
 msgctxt "#30041"
 msgid "No more results"
 msgstr "Žádné další výsledky"
+
+msgctxt "#30042"
+msgid "dub"
+msgstr "dabing"
+
+msgctxt "#30043"
+msgid "subs"
+msgstr "titulky"
+
+msgctxt "#30044"
+msgid "Prefer"
+msgstr "Upřednostnit"
+
+msgctxt "#30045"
+msgid "No preference"
+msgstr "Nezáleží"
+
+msgctxt "#30046"
+msgid "Czech dub"
+msgstr "CZ dabing"
+
+msgctxt "#30047"
+msgid "Czech subtitles"
+msgstr "CZ titulky"

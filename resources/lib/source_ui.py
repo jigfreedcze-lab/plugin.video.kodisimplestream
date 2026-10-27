@@ -154,8 +154,8 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
     all_langs = _languages_from_text(normalized)
 
     audio_patterns = (
-        r"(?:audio|dub(?:bing)?|lang(?:uage)?)\s+(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)",
-        r"(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)\s+(?:audio|dub(?:bing)?|lang(?:uage)?)",
+        r"(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)\s+(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)",
+        r"(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)\s+(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)",
     )
     for pattern in audio_patterns:
         for match in re.finditer(pattern, normalized, re.IGNORECASE):
@@ -181,7 +181,31 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
         if lang not in subtitle_langs:
             _append_unique(audio_langs, lang)
 
+    # Czech words without a language code: "dabing" means a Czech dub, "titulky" Czech subtitles
+    if not audio_langs and re.search(r"(^|\W)dab(?:ing)?($|\W)", normalized):
+        audio_langs.append("CZ")
+    if not subtitle_langs and re.search(r"(^|\W)titulk\w*", normalized):
+        subtitle_langs.append("CZ")
+
     return audio_langs, subtitle_langs
+
+
+def language_tag(source: Dict[str, Any]) -> Tuple[str, str]:
+    """Czech/Slovak dub or subtitles worth a label tag: ("CZ", "audio"), ("SK", "subs") or ("", "")."""
+    for kind, key in (("audio", "audio_langs"), ("subs", "subtitle_langs")):
+        for lang in ("CZ", "SK"):
+            if lang in (source.get(key) or []):
+                return lang, kind
+    return "", ""
+
+
+def matches_language_preference(source: Dict[str, Any], preference: str) -> bool:
+    """preference: "" (no preference), "cz_audio" (Czech dub) or "cz_subs" (Czech subtitles)."""
+    if preference == "cz_audio":
+        return "CZ" in (source.get("audio_langs") or [])
+    if preference == "cz_subs":
+        return "CZ" in (source.get("subtitle_langs") or [])
+    return False
 
 
 def source_score(result: Any) -> Optional[int]:

@@ -22,7 +22,7 @@ sys.modules["xbmc"] = types.SimpleNamespace(
 )
 
 STRINGS = {30007: "Chyba vyhledávání: {}", 30008: "Nenalezeno", 30037: "Řazení: {}", 30038: "Další (strana {})",
-           30039: "Seřadit", 30040: "BEZ ODKAZU", 30041: "ŽÁDNÉ DALŠÍ",
+           30039: "Seřadit", 30040: "BEZ ODKAZU", 30041: "ŽÁDNÉ DALŠÍ", 30042: "dabing", 30043: "titulky",
            30030: "Shoda", 30031: "Hodnocení", 30032: "Nejnovější", 30033: "Největší", 30034: "Nejmenší"}
 
 class Addon:
@@ -161,6 +161,25 @@ groups += 1
 api = FakeAPI({("Dune 2021", 0): (1, [f("D")])}); k.get_api = lambda: api
 k.search_and_score_tmdbh({"mediatype": "movie", "title": "Dune", "year": "2021"})
 assert api.calls and all(c[3] == "" for c in api.calls), api.calls
+groups += 1
+
+# 10. jazyková preference: štítky v názvu, preferované soubory nahoru, jinak pořadí Webshare
+def n(ident, name): return {"ident": ident, "name": name, "size": "100", "img": ""}
+files = [n("P", "Film.2020.1080p.mkv"), n("S", "Film.2020.EN.CZ.titulky.mkv"), n("D", "Film.2020.CZ.Dabing.mkv"), n("Q", "Film.2020.720p.mkv")]
+api = FakeAPI({("a", 0): (4, files)})
+for pref, order in (("0", ["P", "S", "D", "Q"]), ("1", ["D", "P", "S", "Q"]), ("2", ["S", "P", "D", "Q"])):
+    Addon.settings["lang_pref"] = pref; run(api, ["a"])
+    assert [params(u)["ident"] for u, _, _ in items[1:]] == order, (pref, [params(u)["ident"] for u, _, _ in items[1:]])
+labels = {params(u)["ident"]: i.label for u, i, _ in items[1:]}
+assert labels["D"] == "[CZ dabing] Film.2020.CZ.Dabing" and labels["S"] == "[CZ titulky] Film.2020.EN.CZ.titulky" and labels["P"] == "Film.2020.1080p", labels
+# TMDb Helper: bonus k řazení, zobrazené skóre se nemění
+tm = {"mediatype": "movie", "title": "Film", "year": "2020"}
+api = FakeAPI({("Film 2020", 0): (2, [n("P", "Film.2020.1080p.mkv"), n("D", "Film.2020.CZ.Dabing.mkv")])}); k.get_api = lambda: api
+Addon.settings["lang_pref"] = "0"; base = {r["ident"]: r["score"] for r in k.search_and_score_tmdbh(tm)}
+Addon.settings["lang_pref"] = "1"; res = k.search_and_score_tmdbh(tm)
+assert [r["ident"] for r in res][0] == "D" and {r["ident"]: r["score"] for r in res} == base, (res, base)
+Addon.settings["lang_pref"] = "7"; assert k.language_preference() == ""
+Addon.settings["lang_pref"] = "0"
 groups += 1
 
 print(f"webshare výpis: {groups} skupin kontrol prošlo")

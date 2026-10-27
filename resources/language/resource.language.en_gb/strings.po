@@ -138,3 +138,27 @@ msgstr "Webshare returned no download link"
 msgctxt "#30041"
 msgid "No more results"
 msgstr "No more results"
+
+msgctxt "#30042"
+msgid "dub"
+msgstr "dub"
+
+msgctxt "#30043"
+msgid "subs"
+msgstr "subs"
+
+msgctxt "#30044"
+msgid "Prefer"
+msgstr "Prefer"
+
+msgctxt "#30045"
+msgid "No preference"
+msgstr "No preference"
+
+msgctxt "#30046"
+msgid "Czech dub"
+msgstr "Czech dub"
+
+msgctxt "#30047"
+msgid "Czech subtitles"
+msgstr "Czech subtitles"

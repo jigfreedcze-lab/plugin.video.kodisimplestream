@@ -24,6 +24,8 @@ from resources.lib.webshare import WebshareAPI
 from resources.lib.csfd import CSFD
 from resources.lib.source_ui import (
     compact_label,
+    language_tag,
+    matches_language_preference,
     metadata_line,
     normalize_source,
     source_icon_name,
@@ -70,6 +72,28 @@ def _resolution_badge_art(source: Dict[str, Any], fallback_image: str = "") -> D
         "poster": badge,
         "fanart": fallback_image or badge,
     }
+
+# Index of the "lang_pref" setting → preference understood by matches_language_preference()
+LANG_PREFS = ["", "cz_audio", "cz_subs"]
+# Bonus to the TMDb Helper match score when sorting, the shown score stays unchanged
+LANG_PREF_BONUS = 15
+
+def language_preference() -> str:
+    """Returns the preferred language variant from add-on settings ("" = no preference)."""
+    try:
+        index = int(_addon.getSetting("lang_pref") or 0)
+    except ValueError:
+        index = 0
+    return LANG_PREFS[index] if 0 <= index < len(LANG_PREFS) else ""
+
+def _source_label(source: Dict[str, Any]) -> str:
+    """Title label with a Czech/Slovak dub or subtitles tag in front, e.g. "[CZ dabing] Film"."""
+    title = source_title_label(source)
+    lang, kind = language_tag(source)
+    if not lang:
+        return title
+    word = _addon.getLocalizedString(30042 if kind == "audio" else 30043)  # "dabing" / "titulky"
+    return f"[{lang} {word}] {title}"
 
 def get_api() -> Optional[WebshareAPI]:
     """
@@ -218,10 +242,15 @@ def list_search_results(
         url = get_url(action="choose_sort", query=str(search_terms), sort=sort)
         xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=False)
 
-        for file_info in rows:
-            source = normalize_source(file_info)
+        sources = [(file_info, normalize_source(file_info)) for file_info in rows]
+        preference = language_preference()
+        if preference:
+            # Preferred dub/subtitles first, otherwise keep the Webshare order (stable sort)
+            sources.sort(key=lambda pair: not matches_language_preference(pair[1], preference))
+
+        for file_info, source in sources:
             item = xbmcgui.ListItem(
-                label=source_title_label(source),
+                label=_source_label(source),
                 label2=metadata_line(source, include_score=True, include_quality=True),
             )
             item.setInfo("video", {
@@ -490,9 +519,14 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
             if prev is None or item["score"] > prev["score"]:
                 merged[ident] = item
 
+    preference = language_preference()
     sorted_items = sorted(
         merged.values(),
-        key=lambda x: (x["score"], x["quality_pref"], x["size"]),
+        key=lambda x: (
+            x["score"] + (LANG_PREF_BONUS if matches_language_preference(x["source"], preference) else 0),
+            x["quality_pref"],
+            x["size"],
+        ),
         reverse=True,
     )
     debug_scores = _addon.getSettingBool("tmdbh_show_debug_scores")
@@ -541,7 +575,7 @@ def _tmdbh_source_label(result: Dict[str, Any]) -> str:
 def _tmdbh_source_listitem(result: Dict[str, Any]) -> xbmcgui.ListItem:
     source = _tmdbh_source(result)
     item = xbmcgui.ListItem(
-        label=source_title_label(source),
+        label=_source_label(source),
         label2=metadata_line(source, include_score=True, include_quality=True),
     )
     item.setInfo("video", {
@@ -631,7 +665,7 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
     for result in results:
         source = result.get("source") or normalize_source(result)
         item = xbmcgui.ListItem(
-            label=source_title_label(source),
+            label=_source_label(source),
             label2=metadata_line(source, include_score=True, include_quality=True),
         )
         item.setInfo("video", {"title": source["title"], "size": result["size"], "mediatype": "video"})
