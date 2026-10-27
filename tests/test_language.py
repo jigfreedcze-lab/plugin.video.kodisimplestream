@@ -36,6 +36,10 @@ def test_dub_and_subtitles_in_different_languages():
     assert detect_languages("Film.2020.CZ.dabing.EN.titulky.mkv") == (["CZ"], ["EN"])
     assert detect_languages("Film.2020.dabing.CZ.titulky.mkv") == (["CZ"], ["CZ"])
     assert detect_languages("Film.2020.CZ.dab.mkv") == (["CZ"], [])
+    # anglické značky mají jazyk za slovem: dabing CZ, titulky EN
+    assert detect_languages("Film.dub.CZ.sub.EN.mkv") == (["CZ"], ["CZ", "EN"])
+    assert "CZ" in detect_languages("Film.audio.CZ.subs.EN.mkv")[0]
+    assert "CZ" in detect_languages("Film.2020.lang.CZ.subtitles.EN.mkv")[0]
 
 
 def test_language_tag_and_preference():

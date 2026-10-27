@@ -154,9 +154,10 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
     all_langs = _languages_from_text(normalized)
 
     audio_patterns = (
-        # not followed by a subtitles word: "SK dabing CZ titulky" is a Slovak dub with Czech subtitles
+        # not followed by the Czech "titulky": "SK dabing CZ titulky" is a Slovak dub with Czech subtitles.
+        # English tags put the language after the word ("dub CZ sub EN"), there the language belongs to the dub.
         r"(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)\s+(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)"
-        r"(?!\s+(?:titulk|subs?\b|subtitles?\b))",
+        r"(?!\s+titulk)",
         r"(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)\s+(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)",
     )
     for pattern in audio_patterns:
