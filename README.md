@@ -5,7 +5,21 @@
 
 KodiSimpleStream je jednoduchý Kodi plugin, který umí vyhledávat a přehrávat videa z [Webshare.cz](https://webshare.cz)
 
-### Instalace
+> **Tato verze je fork** doplňku [badmin15/plugin.video.kodisimplestream](https://github.com/badmin15/plugin.video.kodisimplestream) (TMDb Helper, výběr zdrojů), který vychází z původního [Kecerim24/plugin.video.kodisimplestream](https://github.com/Kecerim24/plugin.video.kodisimplestream). Navíc: volitelné hledání filmů a seriálů přes TMDb místo nefunkčního ČSFD, řazení a stránkování výsledků z Webshare, rozpoznání CZ dabingu a titulků a opravy chyb. Repozitář původního autora níže v návodu instaluje jeho verzi bez těchto změn.
+
+### Instalace této verze
+1. Stáhněte ZIP této verze (`plugin.video.kodisimplestream-<verze>.zip`), případně ho sestavte z repozitáře:
+   ```
+   git archive --format=zip --prefix=plugin.video.kodisimplestream/ -o plugin.video.kodisimplestream.zip HEAD
+   ```
+2. V Kodi povolte *Nastavení → Systém → Doplňky → Neznámé zdroje*.
+3. *Doplňky → Instalovat ze souboru ZIP* → vyberte stažený ZIP. Závislosti si Kodi stáhne z oficiálního repozitáře samo.
+
+Pokud máte nainstalovaný repozitář *kecerim's repo*, Kodi tuto verzi přepíše původní, jakmile autor vydá vyšší verzi. Chcete-li zůstat u této verze, repozitář autora neinstalujte nebo u doplňku vypněte automatické aktualizace.
+
+Testy: `python tests/run_tests.py`
+
+### Instalace původní verze (z repozitáře autora)
 1. Stáhněte si zip [nejnovější verze repozitáře](https://github.com/Kecerim24/repository.kecerim/releases/latest)
 2. Nainstalujte plugin přes Správce doplňků v Kodi:
    - Přejděte do Doplňků
