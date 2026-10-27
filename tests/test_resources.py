@@ -25,10 +25,8 @@ def _po_ids(lang):
 def _used_ids():
     used = set()
     code = open(os.path.join(REPO, "kodisimplestream.py"), encoding="utf-8").read()
-    used |= {int(x) for x in re.findall(r"getLocalizedString\((\d{5})", code)}
-    for block in re.findall(r"(?:SORT_LABELS|_LABELS)\s*=\s*\[([^\]]*)\]", code):
-        used |= {int(x) for x in re.findall(r"\d{5}", block)}
-    used |= {int(x) for x in re.findall(r'\("[a-z_]+", (\d{5}),', code)}  # položky menu
+    # Každé pětimístné číslo 3xxxx v hlavním modulu je ID textu (getLocalizedString, menu, _keyboard_search, …)
+    used |= {int(x) for x in re.findall(r"\b3\d{4}\b", code)}
     for setting in ET.parse(os.path.join(REPO, "resources", "settings.xml")).iter():
         for attr in ("label", "lvalues"):
             used |= {int(x) for x in re.findall(r"\d{5}", setting.get(attr) or "")}
