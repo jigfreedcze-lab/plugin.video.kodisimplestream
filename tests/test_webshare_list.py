@@ -14,7 +14,6 @@ log = []
 # --- podvržené moduly Kodi a knihoven ---
 sys.modules["requests"] = types.ModuleType("requests")
 sys.modules["xmltodict"] = types.ModuleType("xmltodict")
-sys.modules["bs4"] = types.SimpleNamespace(BeautifulSoup=None)  # csfd.py, dokud je v doplňku
 sys.modules["xbmc"] = types.SimpleNamespace(
     LOGDEBUG=0, LOGINFO=1, LOGWARNING=2,
     log=lambda msg, level=0: log.append(("log", msg)),

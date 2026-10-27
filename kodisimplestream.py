@@ -21,7 +21,7 @@ import xbmcgui
 import xbmcplugin
 
 from resources.lib.webshare import WebshareAPI
-from resources.lib.csfd import CSFD
+from resources.lib.tmdb import TMDB, TMDBAuthError
 from resources.lib.source_ui import (
     compact_label,
     language_tag,
@@ -132,22 +132,71 @@ def get_api() -> Optional[WebshareAPI]:
         )
         return None
 
+def get_tmdb() -> Optional[TMDB]:
+    """
+    Returns a TMDb client using the API key from settings.
+    Shows error notification when the key is missing.
+    """
+    try:
+        return TMDB(_addon.getSetting("tmdb_api_key"))
+    except ValueError:
+        xbmcgui.Dialog().notification(
+            _addon.getAddonInfo("name"),
+            _addon.getLocalizedString(30051),  # "Enter TMDb API key in add-on settings"
+            xbmcgui.NOTIFICATION_ERROR,
+            5000,
+        )
+        return None
+
+def show_tmdb_error(exc: Exception) -> None:
+    """Notifies about a failed TMDb request and closes the current directory."""
+    if isinstance(exc, TMDBAuthError):
+        message = _addon.getLocalizedString(30053)  # "TMDb rejected the API key…"
+    else:
+        message = _addon.getLocalizedString(30007).format(str(exc))
+    xbmcgui.Dialog().notification(
+        _addon.getAddonInfo("name"),
+        message,
+        xbmcgui.NOTIFICATION_ERROR,
+        5000,
+    )
+    xbmcplugin.endOfDirectory(_handle, succeeded=False)
+
 # ----------------------------------------------------------------------------
 # Root menu
 # ----------------------------------------------------------------------------
 
 def list_categories() -> None:
     """Creates items for the plugin's main menu."""
-    for action, label_id in (
-        ("search_webshare", 30011),
-        ("search_csfd_movie", 30012),
-        ("search_csfd_series", 30013),
-    ):
+    menu = [("search_webshare", 30011, "DefaultAddonsSearch.png", True)]
+    # TMDb is optional – without an API key offer setup instead of the TMDb searches
+    if _addon.getSetting("tmdb_api_key").strip():
+        menu += [
+            ("search_tmdb_movie", 30012, "DefaultAddonsSearch.png", True),
+            ("search_tmdb_series", 30013, "DefaultAddonsSearch.png", True),
+        ]
+    else:
+        # Action item, not a folder: Kodi runs it as a script (handle -1) without listing
+        menu.append(("tmdb_setup", 30054, "DefaultAddonProgram.png", False))
+
+    for action, label_id, icon, is_folder in menu:
         item = xbmcgui.ListItem(label=_addon.getLocalizedString(label_id))
-        item.setArt({"icon": "DefaultAddonsSearch.png"})
-        xbmcplugin.addDirectoryItem(_handle, get_url(action=action), item, isFolder=True)
+        item.setArt({"icon": icon})
+        xbmcplugin.addDirectoryItem(_handle, get_url(action=action), item, isFolder=is_folder)
 
     xbmcplugin.endOfDirectory(_handle)
+
+def tmdb_setup() -> None:
+    """Explains how to get a TMDb API key and offers to open the add-on settings."""
+    name = _addon.getAddonInfo("name")
+    xbmcgui.Dialog().textviewer(name, _addon.getLocalizedString(30055))  # How to get the key
+    if xbmcgui.Dialog().yesno(name, _addon.getLocalizedString(30056)):  # "Open settings now?"
+        _addon.openSettings()  # Modal, returns after OK/Cancel
+        # Show the TMDb searches as soon as the key is saved
+        xbmc.executebuiltin("Container.Refresh")
+    # Opened as a folder (old cached menu) or by the Play button – close it and stay in the main menu
+    if _handle >= 0:
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
 
 # ----------------------------------------------------------------------------
 # Playback
@@ -327,11 +376,11 @@ def search_webshare() -> None:
         list_search_results([term])
 
 # ----------------------------------------------------------------------------
-# CSFD – search results
+# TMDb – search results
 # ----------------------------------------------------------------------------
 
-def list_csfd_results(results: List[Dict[str, Any]], search_type: str) -> None:
-    """Displays CSFD search results as Kodi menu items."""
+def list_tmdb_results(results: List[Dict[str, Any]], search_type: str) -> None:
+    """Displays TMDb search results as Kodi menu items."""
     for result in results:
         title = result["title"]
         year = result.get("year")
@@ -346,47 +395,58 @@ def list_csfd_results(results: List[Dict[str, Any]], search_type: str) -> None:
         })
         item.setArt({"poster": result.get("poster", ""), "fanart": result.get("poster", "")})
 
-        url = get_url(action="select_csfd", csfd_id=result["id"], search_type=search_type)
+        url = get_url(action="select_tmdb", tmdb_id=result["id"], search_type=search_type)
         xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=True)
 
     xbmcplugin.endOfDirectory(_handle)
 
 # ----------------------------------------------------------------------------
-# CSFD – selection and detailed episode listing
+# TMDb – selection and detailed episode listing
 # ----------------------------------------------------------------------------
 
-def handle_csfd_selection(csfd_id: str, search_type: str) -> None:
-    """Handles selection from CSFD and delegates search or episode listing."""
-    csfd = CSFD()
-    details = csfd.get_detail(csfd_id)
+def handle_tmdb_selection(tmdb_id: str, search_type: str) -> None:
+    """Handles selection from TMDb and delegates search or episode listing."""
+    tmdb = get_tmdb()
+    if not tmdb:
+        return
+    try:
+        details = tmdb.get_detail(tmdb_id)
+    except Exception as exc:
+        show_tmdb_error(exc)
+        return
 
     if search_type == "movie":
-        queries: List[str] = [f"{details['title']} {details['year']}"]
+        year = details.get("year")
+        queries: List[str] = [f"{details['title']} {year}" if year else details["title"]]
         if details.get("original_title") and details["original_title"] != details["title"]:
             queries.append(details["original_title"])
         list_search_results(queries)
         return
 
     # Series → show list of seasons
-    seasons = csfd.get_seasons(csfd_id)
-    list_seasons(seasons, details["title"], details.get("original_title"), csfd_id)
+    try:
+        seasons = tmdb.get_seasons(tmdb_id)
+    except Exception as exc:
+        show_tmdb_error(exc)
+        return
+    list_seasons(seasons, details["title"], details.get("original_title"), tmdb_id)
 
 # ----------------------------------------------------------------------------
-# CSFD – episode navigation
+# TMDb – episode navigation
 # ----------------------------------------------------------------------------
 
 def list_seasons(
     seasons: List[Dict[str, Any]],
     series_title: str,
     original_title: Optional[str],
-    csfd_id: str,
+    tmdb_id: str,
 ) -> None:
     """Displays list of seasons for a series."""
     for season in seasons:
         label = season["title"] if season["title"] != "Season" else f"Season {season['number']}"
         url = get_url(
             action="list_episodes",
-            csfd_id=csfd_id,
+            tmdb_id=tmdb_id,
             season_id=season["id"],
             series_title=series_title,
             original_title=original_title or "",
@@ -396,14 +456,20 @@ def list_seasons(
     xbmcplugin.endOfDirectory(_handle)
 
 def list_episodes(
-    csfd_id: str,
+    tmdb_id: str,
     season_id: str,
     series_title: str,
     original_title: str,
 ) -> None:
     """Displays episode list for a given season."""
-    csfd = CSFD()
-    episodes = csfd.get_episodes(csfd_id, season_id)
+    tmdb = get_tmdb()
+    if not tmdb:
+        return
+    try:
+        episodes = tmdb.get_episodes(tmdb_id, season_id)
+    except Exception as exc:
+        show_tmdb_error(exc)
+        return
 
     for ep in episodes:
         season_no = ep.get("season") or 0
@@ -420,12 +486,15 @@ def list_episodes(
     xbmcplugin.endOfDirectory(_handle)
 
 # ----------------------------------------------------------------------------
-# CSFD – search entry points
+# TMDb – search entry points
 # ----------------------------------------------------------------------------
 
-def search_csfd_movie() -> None:
-    """Search dialog for CSFD movie titles."""
-    term = _keyboard_search(30014)
+def search_tmdb(label_id: int, search_type: str) -> None:
+    """Search dialog for TMDb movie or TV series titles."""
+    tmdb = get_tmdb()
+    if not tmdb:
+        return
+    term = _keyboard_search(label_id)
     if term:
         xbmcgui.Dialog().notification(
             _addon.getAddonInfo("name"),
@@ -433,22 +502,12 @@ def search_csfd_movie() -> None:
             xbmcgui.NOTIFICATION_INFO,
             2000,
         )
-        results = CSFD().search(term, type="movie")
-        list_csfd_results(results, "movie")
-
-def search_csfd_series() -> None:
-    """Search dialog for CSFD TV series titles."""
-    term = _keyboard_search(30015)
-    if term:
-        xbmcgui.Dialog().notification(
-            _addon.getAddonInfo("name"),
-            _addon.getLocalizedString(30002).format(term),
-            xbmcgui.NOTIFICATION_INFO,
-            2000,
-        )
-        results = CSFD().search(term, type="series")
-        list_csfd_results(results, "series")
-
+        try:
+            results = tmdb.search(term, type=search_type)
+        except Exception as exc:
+            show_tmdb_error(exc)
+            return
+        list_tmdb_results(results, search_type)
 
 
 def _prefer_quality_value(name: str) -> int:
@@ -760,15 +819,17 @@ def router(paramstring: str) -> None:
         play_ident(params["ident"])
     elif action == "tmdbh_play":
         tmdbh_play(params)
-    elif action == "search_csfd_movie":
-        search_csfd_movie()
-    elif action == "search_csfd_series":
-        search_csfd_series()
-    elif action == "select_csfd":
-        handle_csfd_selection(params["csfd_id"], params["search_type"])
+    elif action == "search_tmdb_movie":
+        search_tmdb(30014, "movie")
+    elif action == "search_tmdb_series":
+        search_tmdb(30015, "series")
+    elif action == "tmdb_setup":
+        tmdb_setup()
+    elif action == "select_tmdb":
+        handle_tmdb_selection(params["tmdb_id"], params["search_type"])
     elif action == "list_episodes":
         list_episodes(
-            params["csfd_id"],
+            params["tmdb_id"],
             params["season_id"],
             params["series_title"],
             params.get("original_title", ""),

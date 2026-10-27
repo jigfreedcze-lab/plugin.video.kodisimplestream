@@ -32,6 +32,35 @@ KodiSimpleStream je jednoduchý Kodi plugin, který umí vyhledávat a přehráv
 ### Konfigurace
 1. Po instalaci přejděte do nastavení pluginu
 2. Zadejte své uživatelské jméno a heslo do Webshare.cz
+3. *Volitelně:* pro hledání filmů a seriálů zadejte v sekci Nastavení TMDb svůj TMDb API klíč, viz [TMDb API klíč](#tmdb-api-klíč-volitelné)
+
+### TMDb API klíč (volitelné)
+Hledání filmů a seriálů (české názvy, plakáty, řady a epizody) používá databázi [TMDB](https://www.themoviedb.org). Bez klíče doplněk funguje dál, jen v menu místo hledání filmů a seriálů najdete položku *Zapnout hledání filmů a seriálů (TMDb)…* s krátkým návodem.
+
+Klíč je zdarma a vyřízení trvá pár minut. Každý uživatel si zakládá vlastní – doplněk žádný sdílený klíč neobsahuje.
+
+Bez vlastního klíče můžete filmy a seriály procházet v doplňku TMDb Helper, který KodiSimpleStream použije k přehrání (viz [TMDb Helper integrace](#tmdb-helper-integrace)).
+
+1. Založte si účet na [themoviedb.org/signup](https://www.themoviedb.org/signup) a potvrďte e-mail.
+2. Otevřete [Nastavení → API](https://www.themoviedb.org/settings/api) a klikněte na **Create** (případně *Request an API Key*).
+3. Zvolte typ **Developer** a odsouhlaste podmínky použití.
+4. Vyplňte formulář. Pro osobní použití v Kodi stačí třeba:
+   - **Type of Use:** Personal
+   - **Application Name:** KodiSimpleStream (personal Kodi add-on)
+   - **Application URL:** `http://localhost`
+   - **Application Summary** (TMDb chce podrobnější popis, stačí upravit tento vzor):
+     ```
+     Personal, non-commercial use of the KodiSimpleStream add-on for the Kodi media center on my own devices at home. It uses the TMDB API to search for movies and TV shows by title and to show their Czech titles, release years, plot summaries, posters, seasons and episode lists. The data is only displayed to me, it is not stored in any public database, redistributed or sold. TMDB is credited as the data source in the add-on.
+     ```
+   - zbytek formuláře jsou vaše kontaktní údaje
+5. Po odeslání uvidíte **API Key** (32 znaků) a **API Read Access Token** (dlouhý). Doplněk přijme oba, na televizi se ovladačem snáz zadává kratší API Key.
+6. V Kodi otevřete nastavení doplňku → **Nastavení TMDb** → **TMDb API klíč** a klíč vložte. **Potvrďte tlačítkem OK** – Zpět nebo Esc zadaný klíč zahodí. Po návratu do menu doplňku se objeví hledání filmů a seriálů.
+
+### Zdroj dat
+[![TMDB](https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg)](https://www.themoviedb.org)
+
+Informace o filmech a seriálech (názvy, popisy, plakáty, řady a epizody) pochází z [TMDB](https://www.themoviedb.org).
+This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
 
 ### Použití
 1. Spusťte plugin z vašich Kodi doplňků

@@ -15,4 +15,8 @@
         <setting label="30021" type="text" id="tmdbh_prefer_quality" default="1080p_or_best" />
         <setting label="30022" type="bool" id="tmdbh_show_debug_scores" default="false" />
     </category>
+    <category label="30052">
+        <setting label="30057" type="lsep" />
+        <setting label="30050" type="text" id="tmdb_api_key" option="hidden" default="" />
+    </category>
 </settings>
