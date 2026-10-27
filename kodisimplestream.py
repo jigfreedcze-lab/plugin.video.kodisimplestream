@@ -87,7 +87,7 @@ def get_api() -> Optional[WebshareAPI]:
     if not (username and password):
         xbmcgui.Dialog().notification(
             _addon.getAddonInfo("name"),
-            _addon.getLocalizedString(30006),  # "Please enter username and password…"
+            _addon.getLocalizedString(30009),  # "Please enter username and password…"
             xbmcgui.NOTIFICATION_ERROR,
             5000,
         )
@@ -102,7 +102,7 @@ def get_api() -> Optional[WebshareAPI]:
     except Exception as exc:
         xbmcgui.Dialog().notification(
             _addon.getAddonInfo("name"),
-            _addon.getLocalizedString(30009).format(str(exc)),  # "Login failed…"
+            _addon.getLocalizedString(30006).format(str(exc)),  # "Login failed…"
             xbmcgui.NOTIFICATION_ERROR,
             5000,
         )
