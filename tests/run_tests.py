@@ -7,6 +7,7 @@ import importlib
 import inspect
 import io
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -15,13 +16,25 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, REPO)
 
-UNITTEST_MODULES = ["test_matching"]
-FUNCTION_MODULES = ["test_source_ui", "test_language"]
-SCRIPTS = ["test_tmdb.py", "test_plugin.py", "test_webshare_list.py"]
+def discover():
+    """Sorts tests/test_*.py by style: unittest classes, pytest-like functions, or scripts with stubbed Kodi."""
+    unittest_modules, function_modules, scripts = [], [], []
+    for filename in sorted(os.listdir(HERE)):
+        if not (filename.startswith("test_") and filename.endswith(".py")):
+            continue
+        source = open(os.path.join(HERE, filename), encoding="utf-8").read()
+        if re.search(r"sys\.modules\[\s*[\"']", source):  # sys.modules["xbmc"] = … (stubbed modules)
+            scripts.append(filename)
+        elif "unittest.TestCase" in source:
+            unittest_modules.append(filename[:-3])
+        else:
+            function_modules.append(filename[:-3])
+    return unittest_modules, function_modules, scripts
 
 
 def main() -> int:
     failed = []
+    UNITTEST_MODULES, FUNCTION_MODULES, SCRIPTS = discover()
 
     for name in UNITTEST_MODULES:
         suite = unittest.defaultTestLoader.loadTestsFromName(f"tests.{name}")
