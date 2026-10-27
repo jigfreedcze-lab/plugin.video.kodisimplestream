@@ -154,7 +154,9 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
     all_langs = _languages_from_text(normalized)
 
     audio_patterns = (
-        r"(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)\s+(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)",
+        # not followed by a subtitles word: "SK dabing CZ titulky" is a Slovak dub with Czech subtitles
+        r"(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)\s+(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)"
+        r"(?!\s+(?:titulk|subs?\b|subtitles?\b))",
         r"(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)\s+(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)",
     )
     for pattern in audio_patterns:
@@ -163,7 +165,7 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
                 _append_unique(audio_langs, lang)
 
     subtitle_patterns = (
-        r"(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky)\s+(?:titulk\w*|subs?|subtitles?)",
+        r"(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english)\s+(?:titulk\w*|subs?|subtitles?)",
         r"(?:titulk\w*|subs?|subtitles?)\s+(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)",
     )
     for pattern in subtitle_patterns:
@@ -181,10 +183,12 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
         if lang not in subtitle_langs:
             _append_unique(audio_langs, lang)
 
-    # Czech words without a language code: "dabing" means a Czech dub, "titulky" Czech subtitles
-    if not audio_langs and re.search(r"(^|\W)dab(?:ing)?($|\W)", normalized):
+    # Czech words without a language code: "dabing" means a Czech dub, "titulky" Czech subtitles.
+    # The short "dab" only next to a language code (patterns above), on its own it is often a title word.
+    if not audio_langs and re.search(r"(^|\W)dabing($|\W)", normalized):
         audio_langs.append("CZ")
-    if not subtitle_langs and re.search(r"(^|\W)titulk\w*", normalized):
+    if (not subtitle_langs and re.search(r"(^|\W)titulk\w*", normalized)
+            and not re.search(r"(^|\W)bez\s+titulk", normalized)):
         subtitle_langs.append("CZ")
 
     return audio_langs, subtitle_langs

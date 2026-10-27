@@ -24,6 +24,18 @@ def test_czech_subtitles_words():
 def test_no_false_positives():
     assert detect_languages("Dabble.and.Tito.2019.1080p.mkv") == ([], [])
     assert detect_languages("GoPro - Tomorrowland in 4K.mp4") == ([], [])
+    # samotné „dab“ bývá slovo názvu
+    assert detect_languages("Dab.2019.1080p.mkv") == ([], [])
+    assert detect_languages("The.Dab.Experiment.2019.mkv") == ([], [])
+    assert detect_languages("Film.2020.bez.titulku.mkv") == ([], [])
+
+
+def test_dub_and_subtitles_in_different_languages():
+    # slovenský dabing s českými titulky – běžný tvar názvu na Webshare
+    assert detect_languages("Film.2020.SK.Dabing.CZ.titulky.mkv") == (["SK"], ["CZ"])
+    assert detect_languages("Film.2020.CZ.dabing.EN.titulky.mkv") == (["CZ"], ["EN"])
+    assert detect_languages("Film.2020.dabing.CZ.titulky.mkv") == (["CZ"], ["CZ"])
+    assert detect_languages("Film.2020.CZ.dab.mkv") == (["CZ"], [])
 
 
 def test_language_tag_and_preference():
