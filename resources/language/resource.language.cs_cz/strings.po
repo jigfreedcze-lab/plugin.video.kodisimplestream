@@ -90,3 +90,51 @@ msgstr "Režim preferované kvality (1080p_or_best|720p_or_best|highest)"
 msgctxt "#30022"
 msgid "Show debug scores in labels and logs"
 msgstr "Zobrazit debug skóre v názvech a logu"
+
+msgctxt "#30030"
+msgid "Best match"
+msgstr "Shoda s názvem"
+
+msgctxt "#30031"
+msgid "Rating"
+msgstr "Hodnocení"
+
+msgctxt "#30032"
+msgid "Newest"
+msgstr "Nejnovější"
+
+msgctxt "#30033"
+msgid "Largest"
+msgstr "Největší"
+
+msgctxt "#30034"
+msgid "Smallest"
+msgstr "Nejmenší"
+
+msgctxt "#30035"
+msgid "Default order of results"
+msgstr "Výchozí řazení výsledků"
+
+msgctxt "#30036"
+msgid "Search"
+msgstr "Hledání"
+
+msgctxt "#30037"
+msgid "Order: {}"
+msgstr "Řazení: {}"
+
+msgctxt "#30038"
+msgid "More results (page {})"
+msgstr "Další výsledky (strana {})"
+
+msgctxt "#30039"
+msgid "Order results by"
+msgstr "Seřadit výsledky podle"
+
+msgctxt "#30040"
+msgid "Webshare returned no download link"
+msgstr "Webshare nevrátil odkaz ke stažení"
+
+msgctxt "#30041"
+msgid "No more results"
+msgstr "Žádné další výsledky"

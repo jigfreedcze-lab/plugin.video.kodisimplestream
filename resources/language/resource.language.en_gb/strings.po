@@ -90,3 +90,51 @@ msgstr "Preferred quality mode (1080p_or_best|720p_or_best|highest)"
 msgctxt "#30022"
 msgid "Show debug scores in labels and logs"
 msgstr "Show debug scores in labels and logs"
+
+msgctxt "#30030"
+msgid "Best match"
+msgstr "Best match"
+
+msgctxt "#30031"
+msgid "Rating"
+msgstr "Rating"
+
+msgctxt "#30032"
+msgid "Newest"
+msgstr "Newest"
+
+msgctxt "#30033"
+msgid "Largest"
+msgstr "Largest"
+
+msgctxt "#30034"
+msgid "Smallest"
+msgstr "Smallest"
+
+msgctxt "#30035"
+msgid "Default order of results"
+msgstr "Default order of results"
+
+msgctxt "#30036"
+msgid "Search"
+msgstr "Search"
+
+msgctxt "#30037"
+msgid "Order: {}"
+msgstr "Order: {}"
+
+msgctxt "#30038"
+msgid "More results (page {})"
+msgstr "More results (page {})"
+
+msgctxt "#30039"
+msgid "Order results by"
+msgstr "Order results by"
+
+msgctxt "#30040"
+msgid "Webshare returned no download link"
+msgstr "Webshare returned no download link"
+
+msgctxt "#30041"
+msgid "No more results"
+msgstr "No more results"

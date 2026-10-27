@@ -4,6 +4,9 @@
         <setting label="30003" type="text" id="username" default="" />
         <setting label="30004" type="text" id="password" option="hidden" default="" />
     </category>
+    <category label="30036">
+        <setting label="30035" type="enum" id="ws_sort" lvalues="30030|30031|30032|30033|30034" default="0" />
+    </category>
     <category label="30017">
         <setting label="30018" type="bool" id="tmdbh_auto_play_best" default="false" />
         <setting label="30019" type="number" id="tmdbh_auto_play_min_score" default="80" />

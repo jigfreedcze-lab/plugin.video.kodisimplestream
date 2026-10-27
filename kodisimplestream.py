@@ -137,59 +137,121 @@ def play_video(path: str) -> None:
 # Webshare: search & listing
 # ----------------------------------------------------------------------------
 
-def list_search_results(search_terms: List[str]) -> None:
+PAGE_SIZE = 30
+# Index of the "ws_sort" setting → Webshare API "sort" value.
+# "" (no sort) orders by match with the query – undocumented, but it is the API default.
+SORT_VALUES = ["", "rating", "recent", "largest", "smallest"]
+SORT_LABELS = [30030, 30031, 30032, 30033, 30034]
+
+def default_sort() -> int:
+    """Returns the default sort index from add-on settings."""
+    try:
+        index = int(_addon.getSetting("ws_sort") or 0)
+    except ValueError:
+        index = 0
+    return index if 0 <= index < len(SORT_VALUES) else 0
+
+def _as_list(value: Any) -> List[Any]:
+    """xmltodict returns a dict for a single <file>, a list for more and nothing for none."""
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+def list_search_results(
+    search_terms: List[str],
+    sort: Optional[int] = None,
+    offset: int = 0,
+    replace: bool = False,
+) -> None:
     """
-    Displays search results for a list of search terms using WebshareAPI.
-    Adds each result as a playable item.
+    Displays one page of search results for a list of search terms using WebshareAPI.
+    The same file found by more terms is shown once, the download link is resolved on playback.
     """
     api = get_api()
     if not api:
         return
+    if sort is None or not 0 <= sort < len(SORT_VALUES):
+        sort = default_sort()
+    offset = max(0, offset)
 
     try:
+        seen = set()
+        rows = []
+        has_more = False
+        next_offset = offset + PAGE_SIZE
         for term in search_terms:
-            response = api.search(term)["response"]
-            if int(response.get("total", 0)) == 0:
-                xbmcgui.Dialog().notification(
-                    _addon.getAddonInfo("name"),
-                    _addon.getLocalizedString(30007).format(_addon.getLocalizedString(30008)),
-                    xbmcgui.NOTIFICATION_ERROR,
-                    5000,
-                )
-                continue
-
-            files = response.get("file", [])
-            if isinstance(files, dict):
-                files = [files]
+            response = api.search(term, limit=PAGE_SIZE, offset=offset, sort=SORT_VALUES[sort])["response"]
+            files = _as_list(response.get("file"))
+            # "total" is unreliable for small result sets, trust it only after a full page
+            if len(files) == PAGE_SIZE and int(response.get("total", 0)) > next_offset:
+                has_more = True
 
             for file_info in files:
-                source = normalize_source(file_info)
-                item = xbmcgui.ListItem(
-                    label=source_title_label(source),
-                    label2=metadata_line(source, include_score=True, include_quality=True),
-                )
-                item.setInfo("video", {
-                    "title": source.get("title") or file_info.get("name", term),
-                    "size": source.get("size_bytes", 0),
-                    "mediatype": "video",
-                })
-                item.setArt(_resolution_badge_art(source, file_info.get("img", "")))
-                xbmc.log(
-                    f"[KodiSimpleStream] normalized Webshare source quality={source['quality_label']} "
-                    f"resolution={source['resolution_label']} name={source['original_name']}",
-                    xbmc.LOGDEBUG,
-                )
-
-                video_url = api.get_download_link(file_info["ident"])
-                if not video_url:
+                ident = file_info.get("ident")
+                if not ident or ident in seen:
                     continue
+                seen.add(ident)
+                rows.append(file_info)
 
-                item.setProperty("IsPlayable", "true")
-                xbmcplugin.addDirectoryItem(_handle, get_url(action="play", video=video_url), item, isFolder=False)
+        if not rows and offset:
+            xbmcgui.Dialog().notification(
+                _addon.getAddonInfo("name"),
+                _addon.getLocalizedString(30041),  # "No more results"
+                xbmcgui.NOTIFICATION_INFO,
+                3000,
+            )
+            # Kodi goes back to the previous page
+            xbmcplugin.endOfDirectory(_handle, succeeded=False)
+            return
+        if not rows:
+            xbmcgui.Dialog().notification(
+                _addon.getAddonInfo("name"),
+                _addon.getLocalizedString(30007).format(_addon.getLocalizedString(30008)),
+                xbmcgui.NOTIFICATION_ERROR,
+                5000,
+            )
 
-        xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_NONE)
+        # Sort switch on top – applies only to this search, the default is in settings
+        item = xbmcgui.ListItem(label=_addon.getLocalizedString(30037).format(_addon.getLocalizedString(SORT_LABELS[sort])))
+        item.setArt({"icon": "DefaultAddonsSearch.png", "thumb": "DefaultAddonsSearch.png"})
+        item.setProperty("SpecialSort", "top")
+        url = get_url(action="choose_sort", query=str(search_terms), sort=sort)
+        xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=False)
+
+        for file_info in rows:
+            source = normalize_source(file_info)
+            item = xbmcgui.ListItem(
+                label=source_title_label(source),
+                label2=metadata_line(source, include_score=True, include_quality=True),
+            )
+            item.setInfo("video", {
+                "title": source.get("title") or file_info.get("name", ""),
+                "size": source.get("size_bytes", 0),
+                "mediatype": "video",
+            })
+            item.setArt(_resolution_badge_art(source, file_info.get("img", "")))
+            xbmc.log(
+                f"[KodiSimpleStream] normalized Webshare source quality={source['quality_label']} "
+                f"resolution={source['resolution_label']} name={source['original_name']}",
+                xbmc.LOGDEBUG,
+            )
+            item.setProperty("IsPlayable", "true")
+            xbmcplugin.addDirectoryItem(_handle, get_url(action="play_ident", ident=file_info["ident"]), item, isFolder=False)
+
+        if has_more:
+            item = xbmcgui.ListItem(label=_addon.getLocalizedString(30038).format(next_offset // PAGE_SIZE + 1))
+            item.setArt({"icon": "DefaultFolder.png", "thumb": "DefaultFolder.png"})
+            item.setProperty("SpecialSort", "bottom")
+            url = get_url(action="list_search_results", query=str(search_terms), sort=sort, offset=next_offset)
+            xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=True)
+
+        # Kodi sorting (side menu) only reorders the loaded page
+        xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_LABEL)
+        xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_SIZE)
         xbmcplugin.setContent(_handle, "videos")
-        xbmcplugin.endOfDirectory(_handle)
+        # replace: a new order of the same search takes the place of the old one in history
+        xbmcplugin.endOfDirectory(_handle, updateListing=replace)
     except Exception as exc:
         xbmcgui.Dialog().notification(
             _addon.getAddonInfo("name"),
@@ -197,6 +259,17 @@ def list_search_results(search_terms: List[str]) -> None:
             xbmcgui.NOTIFICATION_ERROR,
             5000,
         )
+
+def choose_sort(search_terms: List[str], current: int) -> None:
+    """Lets the user pick a different order for the current search and reloads the list."""
+    labels = [_addon.getLocalizedString(label_id) for label_id in SORT_LABELS]
+    selected = xbmcgui.Dialog().select(_addon.getLocalizedString(30039), labels, preselect=current)
+    if 0 <= selected != current:
+        url = get_url(action="list_search_results", query=str(search_terms), sort=selected, replace=1)
+        xbmc.executebuiltin(f"Container.Update({url})")
+    # Opened as a folder or by the Play button – close it and stay in the list
+    if _handle >= 0:
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
 
 # ----------------------------------------------------------------------------
 # Generic input dialog for searching
@@ -378,7 +451,8 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
 
     for term in queries:
         try:
-            response = api.search(term).get("response", {})
+            # Best-match order: search words are OR-ed, other orders bring files sharing just one word
+            response = api.search(term, sort="").get("response", {})
         except Exception as exc:
             xbmc.log(f"[KodiSimpleStream] search failed for term '{term}': {exc}", xbmc.LOGWARNING)
             continue
@@ -432,13 +506,23 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
 
 
 def play_ident(ident: str) -> None:
+    """Asks Webshare for the download link only when the file is played."""
     api = get_api()
     if not api:
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
-    video_url = api.get_download_link(ident)
+    try:
+        video_url = api.get_download_link(ident)
+    except Exception as exc:
+        xbmc.log(f"[KodiSimpleStream] file_link failed for {ident}: {exc}", xbmc.LOGWARNING)
+        video_url = ""
     if not video_url:
-        xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "Unable to resolve selected source", xbmcgui.NOTIFICATION_ERROR, 5000)
+        xbmcgui.Dialog().notification(
+            _addon.getAddonInfo("name"),
+            _addon.getLocalizedString(30040),  # "Webshare returned no download link"
+            xbmcgui.NOTIFICATION_ERROR,
+            5000,
+        )
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
     play_video(video_url)
@@ -606,6 +690,23 @@ def list_videos(category: str) -> None:
 # Routing
 # ----------------------------------------------------------------------------
 
+def _parse_query(raw_query: str) -> List[str]:
+    """Search terms are passed in the URL as a Python list literal (or a plain string)."""
+    try:
+        query_list = ast.literal_eval(raw_query)
+        if not isinstance(query_list, list):
+            query_list = [raw_query]
+    except (ValueError, SyntaxError):
+        query_list = [raw_query]
+    return [str(q) for q in query_list]
+
+def _int_param(params: Dict[str, str], name: str) -> Optional[int]:
+    """Returns an integer URL parameter, None when missing or invalid."""
+    try:
+        return int(params[name])
+    except (KeyError, ValueError):
+        return None
+
 def router(paramstring: str) -> None:
     """Dispatches actions based on plugin paramstring."""
     params = dict(parse_qsl(paramstring))
@@ -639,14 +740,14 @@ def router(paramstring: str) -> None:
             params.get("original_title", ""),
         )
     elif action == "list_search_results":
-        raw_query = params["query"]
-        try:
-            query_list = ast.literal_eval(raw_query)
-            if not isinstance(query_list, list):
-                query_list = [raw_query]
-        except (ValueError, SyntaxError):
-            query_list = [raw_query]
-        list_search_results([str(q) for q in query_list])
+        list_search_results(
+            _parse_query(params["query"]),
+            _int_param(params, "sort"),
+            _int_param(params, "offset") or 0,
+            params.get("replace") == "1",
+        )
+    elif action == "choose_sort":
+        choose_sort(_parse_query(params["query"]), _int_param(params, "sort") or 0)
     else:
         raise ValueError(f"Invalid paramstring: {paramstring}!")
 
