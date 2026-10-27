@@ -3,11 +3,6 @@
     <category label="30010">
         <setting label="30003" type="text" id="username" default="" />
         <setting label="30004" type="text" id="password" option="hidden" default="" />
-        <setting label="30018" type="bool" id="tmdbh_auto_play_best" default="" />
-        <setting label="30019" type="number" id="tmdbh_auto_play_min_score" default="80" />
-        <setting label="30020" type="number" id="tmdbh_max_results" default="20" />
-        <setting label="30021" type="text" id="tmdbh_prefer_quality" default="1080p_or_best" />
-        <setting label="30022" type="bool" id="tmdbh_show_debug_scores" default="false" />
     </category>
     <category label="30017">
         <setting label="30018" type="bool" id="tmdbh_auto_play_best" default="false" />
