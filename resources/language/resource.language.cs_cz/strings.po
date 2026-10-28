@@ -195,3 +195,7 @@ msgstr "Otevřít nastavení doplňku teď?"
 msgctxt "#30057"
 msgid "Optional – without a key only Webshare search works"
 msgstr "Volitelné – bez klíče funguje jen hledání na Webshare"
+
+msgctxt "#30058"
+msgid "Video preview instead of the quality badge"
+msgstr "Náhled videa místo odznaku kvality"

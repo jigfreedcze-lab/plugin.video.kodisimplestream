@@ -195,3 +195,7 @@ msgstr "Open add-on settings now?"
 msgctxt "#30057"
 msgid "Optional – without a key only Webshare search works"
 msgstr "Optional – without a key only Webshare search works"
+
+msgctxt "#30058"
+msgid "Video preview instead of the quality badge"
+msgstr "Video preview instead of the quality badge"

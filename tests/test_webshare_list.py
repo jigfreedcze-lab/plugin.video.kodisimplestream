@@ -291,3 +291,23 @@ assert called == [] and log == [("resolved", False, "")], log
 log.clear(); k.list_tmdbh_sources({"mediatype": "movie", "title": "Film"})
 assert called == [] and log == [("end", False, False)], log
 print("tmdbh bez přihlášení: OK")
+
+# 15. Náhled videa místo odznaku kvality (výchozí), kvalita v popisku; vypnutí v nastavení; soubor bez náhledu
+k.get_api = lambda: FakeAPI({("a", 0): (2, [{"ident": "P", "name": "Film.2020.1080p.CZ.Dabing.mkv", "size": "100", "img": "https://img/P-S.jpg"},
+                                              {"ident": "N", "name": "Film.2020.mkv", "size": "100", "img": ""}])})
+items.clear(); log.clear(); k.list_search_results(["a"])
+p, n = items[1][1], items[2][1]
+assert p.art["thumb"] == p.art["icon"] == "https://img/P-S.jpg" and p.label.startswith("[FHD] [CZ dabing] "), (p.art, p.label)
+assert n.art["thumb"].endswith("sd.png") and not n.label.startswith("["), (n.art, n.label)
+Addon.settings["preview_thumbs"] = "false"
+items.clear(); log.clear(); k.list_search_results(["a"])
+p = items[1][1]; assert p.art["thumb"].endswith("FHD.png") and p.art["fanart"] == "https://img/P-S.jpg" and p.label.startswith("[CZ dabing] "), (p.art, p.label)
+Addon.settings.pop("preview_thumbs")
+print("náhledy: OK")
+
+# 16. Výběr zdroje TMDb Helperu má stejný náhled a popisek
+li = k._tmdbh_source_listitem({"ident": "P", "name": "Film.2020.1080p.CZ.Dabing.mkv", "img": "https://img/P-S.jpg", "size": 100, "score": 90})
+assert li.art["thumb"] == li.art["landscape"] == "https://img/P-S.jpg" and li.label.startswith("[FHD] [CZ dabing] "), (li.art, li.label)
+li = k._tmdbh_source_listitem({"ident": "N", "name": "Film.2020.mkv", "img": None, "size": 100, "score": 50})
+assert li.art["thumb"].endswith("sd.png") and not li.label.startswith("["), (li.art, li.label)
+print("náhledy TMDb Helper: OK")

@@ -314,7 +314,7 @@ def compact_label(source: Dict[str, Any], include_score: bool = True, max_title:
 
 
 def source_title_label(source: Dict[str, Any], max_title: int = 54) -> str:
-    """Title-only label for rows where artwork already shows the quality badge."""
+    """Title-only label; the quality is shown by the badge artwork or a tag added by the caller."""
     return ellipsize(source.get("title") or source.get("original_name") or "Unknown source", max_title)
 
 

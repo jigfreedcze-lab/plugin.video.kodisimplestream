@@ -67,13 +67,20 @@ def _icon_path(filename: str) -> str:
     return os.path.join(_addon.getAddonInfo("path"), "icons", filename)
 
 
+def _preview_thumbs() -> bool:
+    """Video preview from Webshare instead of the quality badge (setting, on by default)."""
+    return _addon.getSetting("preview_thumbs") != "false"
+
 def _resolution_badge_art(source: Dict[str, Any], fallback_image: str = "") -> Dict[str, str]:
-    """Artwork for source rows, using bundled resolution badges as primary art."""
+    """Artwork for source rows: the Webshare video preview, or the bundled resolution badge."""
     badge = _icon_path(source_icon_name(source))
+    # Kodi downloads and caches the preview itself, only for the rows it shows
+    thumb = fallback_image if fallback_image and _preview_thumbs() else badge
     return {
-        "icon": badge,
-        "thumb": badge,
-        "poster": badge,
+        "icon": thumb,
+        "thumb": thumb,
+        "poster": thumb,
+        "landscape": thumb,
         "fanart": fallback_image or badge,
     }
 
@@ -89,14 +96,21 @@ def language_preference() -> str:
         index = 0
     return LANG_PREFS[index] if 0 <= index < len(LANG_PREFS) else ""
 
-def _source_label(source: Dict[str, Any]) -> str:
-    """Title label with a Czech/Slovak dub or subtitles tag in front, e.g. "[CZ dabing] Film"."""
+def _source_label(source: Dict[str, Any], image: str = "") -> str:
+    """Title label with tags in front, e.g. "[FHD] [CZ dabing] Film".
+
+    The quality tag is added when the preview replaces the quality badge; SD is left out,
+    it mostly means "not in the file name".
+    """
     title = source_title_label(source)
     lang, kind = language_tag(source)
-    if not lang:
-        return title
-    word = _addon.getLocalizedString(30042 if kind == "audio" else 30043)  # "dabing" / "titulky"
-    return f"[{lang} {word}] {title}"
+    if lang:
+        word = _addon.getLocalizedString(30042 if kind == "audio" else 30043)  # "dabing" / "titulky"
+        title = f"[{lang} {word}] {title}"
+    quality = source.get("quality_label") or ""
+    if image and _preview_thumbs() and quality in ("4K", "FHD", "HD"):
+        title = f"[{quality}] {title}"
+    return title
 
 def get_api() -> Optional[WebshareAPI]:
     """
@@ -317,7 +331,7 @@ def list_search_results(
 
         for file_info, source in sources:
             item = xbmcgui.ListItem(
-                label=_source_label(source),
+                label=_source_label(source, file_info.get("img", "")),
                 label2=metadata_line(source, include_score=True, include_quality=True),
             )
             item.setInfo("video", {
@@ -659,7 +673,7 @@ def _tmdbh_source_label(result: Dict[str, Any]) -> str:
 def _tmdbh_source_listitem(result: Dict[str, Any]) -> xbmcgui.ListItem:
     source = _tmdbh_source(result)
     item = xbmcgui.ListItem(
-        label=_source_label(source),
+        label=_source_label(source, result.get("img", "")),
         label2=metadata_line(source, include_score=True, include_quality=True),
     )
     item.setInfo("video", {
@@ -753,7 +767,7 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
     for result in results:
         source = result.get("source") or normalize_source(result)
         item = xbmcgui.ListItem(
-            label=_source_label(source),
+            label=_source_label(source, result.get("img", "")),
             label2=metadata_line(source, include_score=True, include_quality=True),
         )
         item.setInfo("video", {"title": source["title"], "size": result["size"], "mediatype": "video"})

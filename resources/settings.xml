@@ -7,6 +7,7 @@
     <category label="30036">
         <setting label="30035" type="enum" id="ws_sort" lvalues="30030|30031|30032|30033|30034" default="0" />
         <setting label="30044" type="enum" id="lang_pref" lvalues="30045|30046|30047" default="0" />
+        <setting label="30058" type="bool" id="preview_thumbs" default="true" />
     </category>
     <category label="30017">
         <setting label="30018" type="bool" id="tmdbh_auto_play_best" default="false" />
