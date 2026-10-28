@@ -1,0 +1,2143 @@
+[
+ {
+  "id": "vratne_lahve",
+  "type": "movie",
+  "category": "cz_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:6079",
+   "cs": "Vratné lahve",
+   "original": "Vratné lahve",
+   "original_language": "cs",
+   "english": "Empties",
+   "year": "2007",
+   "imdb_id": "tt0809951",
+   "addon_title": "Vratné lahve",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Vratné lahve",
+   "originaltitle": "",
+   "year": "2007"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Vratné lahve",
+   "originaltitle": "Vratné lahve",
+   "year": "2007",
+   "imdb_id": "tt0809951",
+   "tmdb_id": "6079"
+  },
+  "pool_size": 65
+ },
+ {
+  "id": "kolja",
+  "type": "movie",
+  "category": "cz_movie",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:784",
+   "cs": "Kolja",
+   "original": "Kolja",
+   "original_language": "cs",
+   "english": "Kolya",
+   "year": "1996",
+   "imdb_id": "tt0116790",
+   "addon_title": "Kolja",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Kolja",
+   "originaltitle": "",
+   "year": "1996"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Kolja",
+   "originaltitle": "Kolja",
+   "year": "1996",
+   "imdb_id": "tt0116790",
+   "tmdb_id": "784"
+  },
+  "pool_size": 52
+ },
+ {
+  "id": "samotari",
+  "type": "movie",
+  "category": "cz_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:31321",
+   "cs": "Samotáři",
+   "original": "Samotáři",
+   "original_language": "cs",
+   "english": "Loners",
+   "year": "2000",
+   "imdb_id": "tt0219288",
+   "addon_title": "Samotáři",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Samotáři",
+   "originaltitle": "",
+   "year": "2000"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Samotáři",
+   "originaltitle": "Samotáři",
+   "year": "2000",
+   "imdb_id": "tt0219288",
+   "tmdb_id": "31321"
+  },
+  "pool_size": 115
+ },
+ {
+  "id": "kulovy_blesk",
+  "type": "movie",
+  "category": "cz_movie",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:36414",
+   "cs": "Kulový blesk",
+   "original": "Kulový blesk",
+   "original_language": "cs",
+   "english": "Ball Lightning",
+   "year": "1979",
+   "imdb_id": "tt0077821",
+   "addon_title": "Kulový blesk",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Kulový blesk",
+   "originaltitle": "",
+   "year": "1979"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Kulový blesk",
+   "originaltitle": "Kulový blesk",
+   "year": "1979",
+   "imdb_id": "tt0077821",
+   "tmdb_id": "36414"
+  },
+  "pool_size": 91
+ },
+ {
+  "id": "baba_z_ledu",
+  "type": "movie",
+  "category": "cz_movie",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:453204",
+   "cs": "Bába z ledu",
+   "original": "Bába z ledu",
+   "original_language": "cs",
+   "english": "Ice Mother",
+   "year": "2017",
+   "imdb_id": "tt5495726",
+   "addon_title": "Bába z ledu",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Bába z ledu",
+   "originaltitle": "",
+   "year": "2017"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Bába z ledu",
+   "originaltitle": "Bába z ledu",
+   "year": "2017",
+   "imdb_id": "tt5495726",
+   "tmdb_id": "453204"
+  },
+  "pool_size": 120
+ },
+ {
+  "id": "shawshank",
+  "type": "movie",
+  "category": "foreign_cs_title",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:278",
+   "cs": "Vykoupení z věznice Shawshank",
+   "original": "The Shawshank Redemption",
+   "original_language": "en",
+   "english": "The Shawshank Redemption",
+   "year": "1994",
+   "imdb_id": "tt0111161",
+   "addon_title": "Vykoupení z věznice Shawshank",
+   "addon_original_title": "The Shawshank Redemption"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Vykoupení z věznice Shawshank",
+   "originaltitle": "The Shawshank Redemption",
+   "year": "1994"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Vykoupení z věznice Shawshank",
+   "originaltitle": "The Shawshank Redemption",
+   "year": "1994",
+   "imdb_id": "tt0111161",
+   "tmdb_id": "278"
+  },
+  "pool_size": 82
+ },
+ {
+  "id": "kukacci_hnizdo",
+  "type": "movie",
+  "category": "foreign_cs_title",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:510",
+   "cs": "Přelet nad kukaččím hnízdem",
+   "original": "One Flew Over the Cuckoo's Nest",
+   "original_language": "en",
+   "english": "One Flew Over the Cuckoo's Nest",
+   "year": "1975",
+   "imdb_id": "tt0073486",
+   "addon_title": "Přelet nad kukaččím hnízdem",
+   "addon_original_title": "One Flew Over the Cuckoo's Nest"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Přelet nad kukaččím hnízdem",
+   "originaltitle": "One Flew Over the Cuckoo's Nest",
+   "year": "1975"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Přelet nad kukaččím hnízdem",
+   "originaltitle": "One Flew Over the Cuckoo's Nest",
+   "year": "1975",
+   "imdb_id": "tt0073486",
+   "tmdb_id": "510"
+  },
+  "pool_size": 118
+ },
+ {
+  "id": "zelena_mile",
+  "type": "movie",
+  "category": "foreign_cs_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:497",
+   "cs": "Zelená míle",
+   "original": "The Green Mile",
+   "original_language": "en",
+   "english": "The Green Mile",
+   "year": "1999",
+   "imdb_id": "tt0120689",
+   "addon_title": "Zelená míle",
+   "addon_original_title": "The Green Mile"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Zelená míle",
+   "originaltitle": "The Green Mile",
+   "year": "1999"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Zelená míle",
+   "originaltitle": "The Green Mile",
+   "year": "1999",
+   "imdb_id": "tt0120689",
+   "tmdb_id": "497"
+  },
+  "pool_size": 104
+ },
+ {
+  "id": "mlceni_jehnatek",
+  "type": "movie",
+  "category": "foreign_cs_title",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:274",
+   "cs": "Mlčení jehňátek",
+   "original": "The Silence of the Lambs",
+   "original_language": "en",
+   "english": "The Silence of the Lambs",
+   "year": "1991",
+   "imdb_id": "tt0102926",
+   "addon_title": "Mlčení jehňátek",
+   "addon_original_title": "The Silence of the Lambs"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Mlčení jehňátek",
+   "originaltitle": "The Silence of the Lambs",
+   "year": "1991"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Mlčení jehňátek",
+   "originaltitle": "The Silence of the Lambs",
+   "year": "1991",
+   "imdb_id": "tt0102926",
+   "tmdb_id": "274"
+  },
+  "pool_size": 138
+ },
+ {
+  "id": "nedotknutelni",
+  "type": "movie",
+  "category": "foreign_cs_title",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:77338",
+   "cs": "Nedotknutelní",
+   "original": "Intouchables",
+   "original_language": "fr",
+   "english": "The Intouchables",
+   "year": "2011",
+   "imdb_id": "tt1675434",
+   "addon_title": "Nedotknutelní",
+   "addon_original_title": "Intouchables"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Nedotknutelní",
+   "originaltitle": "Intouchables",
+   "year": "2011"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Nedotknutelní",
+   "originaltitle": "Intouchables",
+   "year": "2011",
+   "imdb_id": "tt1675434",
+   "tmdb_id": "77338"
+  },
+  "pool_size": 135
+ },
+ {
+  "id": "tenkrat_na_zapade",
+  "type": "movie",
+  "category": "foreign_cs_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:335",
+   "cs": "Tenkrát na Západě",
+   "original": "C'era una volta il West",
+   "original_language": "it",
+   "english": "Once Upon a Time in the West",
+   "year": "1968",
+   "imdb_id": "tt0064116",
+   "addon_title": "Tenkrát na Západě",
+   "addon_original_title": "C'era una volta il West"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Tenkrát na Západě",
+   "originaltitle": "C'era una volta il West",
+   "year": "1968"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Tenkrát na Západě",
+   "originaltitle": "C'era una volta il West",
+   "year": "1968",
+   "imdb_id": "tt0064116",
+   "tmdb_id": "335"
+  },
+  "pool_size": 149
+ },
+ {
+  "id": "cesta_do_fantazie",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:129",
+   "cs": "Cesta do fantazie",
+   "original": "千と千尋の神隠し",
+   "original_language": "ja",
+   "english": "Spirited Away",
+   "year": "2001",
+   "imdb_id": "tt0245429",
+   "addon_title": "Cesta do fantazie",
+   "addon_original_title": "Spirited Away"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Cesta do fantazie",
+   "originaltitle": "Spirited Away",
+   "year": "2001"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Cesta do fantazie",
+   "originaltitle": "千と千尋の神隠し",
+   "year": "2001",
+   "imdb_id": "tt0245429",
+   "tmdb_id": "129"
+  },
+  "pool_size": 117
+ },
+ {
+  "id": "parazit",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:496243",
+   "cs": "Parazit",
+   "original": "기생충",
+   "original_language": "ko",
+   "english": "Parasite",
+   "year": "2019",
+   "imdb_id": "tt6751668",
+   "addon_title": "Parazit",
+   "addon_original_title": "Parasite"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Parazit",
+   "originaltitle": "Parasite",
+   "year": "2019"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Parazit",
+   "originaltitle": "기생충",
+   "year": "2019",
+   "imdb_id": "tt6751668",
+   "tmdb_id": "496243"
+  },
+  "pool_size": 164
+ },
+ {
+  "id": "your_name",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:372058",
+   "cs": "Tvoje jméno.",
+   "original": "君の名は。",
+   "original_language": "ja",
+   "english": "Your Name.",
+   "year": "2016",
+   "imdb_id": "tt5311514",
+   "addon_title": "Tvoje jméno.",
+   "addon_original_title": "Your Name."
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Tvoje jméno.",
+   "originaltitle": "Your Name.",
+   "year": "2016"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Tvoje jméno.",
+   "originaltitle": "君の名は。",
+   "year": "2016",
+   "imdb_id": "tt5311514",
+   "tmdb_id": "372058"
+  },
+  "pool_size": 154
+ },
+ {
+  "id": "vlak_do_pusanu",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:396535",
+   "cs": "Vlak do Busanu",
+   "original": "부산행",
+   "original_language": "ko",
+   "english": "Train to Busan",
+   "year": "2016",
+   "imdb_id": "tt5700672",
+   "addon_title": "Vlak do Busanu",
+   "addon_original_title": "Train to Busan"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Vlak do Busanu",
+   "originaltitle": "Train to Busan",
+   "year": "2016"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Vlak do Busanu",
+   "originaltitle": "부산행",
+   "year": "2016",
+   "imdb_id": "tt5700672",
+   "tmdb_id": "396535"
+  },
+  "pool_size": 121
+ },
+ {
+  "id": "sedm_samuraju",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:346",
+   "cs": "Sedm samurajů",
+   "original": "七人の侍",
+   "original_language": "ja",
+   "english": "Seven Samurai",
+   "year": "1954",
+   "imdb_id": "tt0047478",
+   "addon_title": "Sedm samurajů",
+   "addon_original_title": "Seven Samurai"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Sedm samurajů",
+   "originaltitle": "Seven Samurai",
+   "year": "1954"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Sedm samurajů",
+   "originaltitle": "七人の侍",
+   "year": "1954",
+   "imdb_id": "tt0047478",
+   "tmdb_id": "346"
+  },
+  "pool_size": 124
+ },
+ {
+  "id": "moskva_slzam",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:21028",
+   "cs": "Moskva slzám nevěří",
+   "original": "Москва слезам не верит",
+   "original_language": "ru",
+   "english": "Moscow Does Not Believe in Tears",
+   "year": "1980",
+   "imdb_id": "tt0079579",
+   "addon_title": "Moskva slzám nevěří",
+   "addon_original_title": "Moscow Does Not Believe in Tears"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Moskva slzám nevěří",
+   "originaltitle": "Moscow Does Not Believe in Tears",
+   "year": "1980"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Moskva slzám nevěří",
+   "originaltitle": "Москва слезам не верит",
+   "year": "1980",
+   "imdb_id": "tt0079579",
+   "tmdb_id": "21028"
+  },
+  "pool_size": 153
+ },
+ {
+  "id": "duna_1984",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:841",
+   "cs": "Duna",
+   "original": "Dune",
+   "original_language": "en",
+   "english": "Dune",
+   "year": "1984",
+   "imdb_id": "tt0087182",
+   "addon_title": "Duna",
+   "addon_original_title": "Dune"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Duna",
+   "originaltitle": "Dune",
+   "year": "1984"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Duna",
+   "originaltitle": "Dune",
+   "year": "1984",
+   "imdb_id": "tt0087182",
+   "tmdb_id": "841"
+  },
+  "pool_size": 138
+ },
+ {
+  "id": "duna_2021",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:438631",
+   "cs": "Duna",
+   "original": "Dune",
+   "original_language": "en",
+   "english": "Dune",
+   "year": "2021",
+   "imdb_id": "tt1160419",
+   "addon_title": "Duna",
+   "addon_original_title": "Dune"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Duna",
+   "originaltitle": "Dune",
+   "year": "2021"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Duna",
+   "originaltitle": "Dune",
+   "year": "2021",
+   "imdb_id": "tt1160419",
+   "tmdb_id": "438631"
+  },
+  "pool_size": 171
+ },
+ {
+  "id": "lvi_kral_1994",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:8587",
+   "cs": "Lví král",
+   "original": "The Lion King",
+   "original_language": "en",
+   "english": "The Lion King",
+   "year": "1994",
+   "imdb_id": "tt0110357",
+   "addon_title": "Lví král",
+   "addon_original_title": "The Lion King"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Lví král",
+   "originaltitle": "The Lion King",
+   "year": "1994"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Lví král",
+   "originaltitle": "The Lion King",
+   "year": "1994",
+   "imdb_id": "tt0110357",
+   "tmdb_id": "8587"
+  },
+  "pool_size": 127
+ },
+ {
+  "id": "lvi_kral_2019",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:420818",
+   "cs": "Lví král",
+   "original": "The Lion King",
+   "original_language": "en",
+   "english": "The Lion King",
+   "year": "2019",
+   "imdb_id": "tt6105098",
+   "addon_title": "Lví král",
+   "addon_original_title": "The Lion King"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Lví král",
+   "originaltitle": "The Lion King",
+   "year": "2019"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Lví král",
+   "originaltitle": "The Lion King",
+   "year": "2019",
+   "imdb_id": "tt6105098",
+   "tmdb_id": "420818"
+  },
+  "pool_size": 138
+ },
+ {
+  "id": "matrix_1999",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:603",
+   "cs": "Matrix",
+   "original": "The Matrix",
+   "original_language": "en",
+   "english": "The Matrix",
+   "year": "1999",
+   "imdb_id": "tt0133093",
+   "addon_title": "Matrix",
+   "addon_original_title": "The Matrix"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Matrix",
+   "originaltitle": "The Matrix",
+   "year": "1999"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Matrix",
+   "originaltitle": "The Matrix",
+   "year": "1999",
+   "imdb_id": "tt0133093",
+   "tmdb_id": "603"
+  },
+  "pool_size": 129
+ },
+ {
+  "id": "andel_pane_2",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:428330",
+   "cs": "Anděl Páně 2",
+   "original": "Anděl Páně 2",
+   "original_language": "cs",
+   "english": "Angel 2",
+   "year": "2016",
+   "imdb_id": "tt4901798",
+   "addon_title": "Anděl Páně 2",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Anděl Páně 2",
+   "originaltitle": "",
+   "year": "2016"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Anděl Páně 2",
+   "originaltitle": "Anděl Páně 2",
+   "year": "2016",
+   "imdb_id": "tt4901798",
+   "tmdb_id": "428330"
+  },
+  "pool_size": 102
+ },
+ {
+  "id": "slunce_seno_jahody",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:36994",
+   "cs": "Slunce, seno, jahody",
+   "original": "Slunce, seno, jahody",
+   "original_language": "cs",
+   "english": "Sun, Hay, Strawberries",
+   "year": "1984",
+   "imdb_id": "tt0195274",
+   "addon_title": "Slunce, seno, jahody",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Slunce, seno, jahody",
+   "originaltitle": "",
+   "year": "1984"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Slunce, seno, jahody",
+   "originaltitle": "Slunce, seno, jahody",
+   "year": "1984",
+   "imdb_id": "tt0195274",
+   "tmdb_id": "36994"
+  },
+  "pool_size": 108
+ },
+ {
+  "id": "sam_doma",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:771",
+   "cs": "Sám doma",
+   "original": "Home Alone",
+   "original_language": "en",
+   "english": "Home Alone",
+   "year": "1990",
+   "imdb_id": "tt0099785",
+   "addon_title": "Sám doma",
+   "addon_original_title": "Home Alone"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Sám doma",
+   "originaltitle": "Home Alone",
+   "year": "1990"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Sám doma",
+   "originaltitle": "Home Alone",
+   "year": "1990",
+   "imdb_id": "tt0099785",
+   "tmdb_id": "771"
+  },
+  "pool_size": 119
+ },
+ {
+  "id": "up",
+  "type": "movie",
+  "category": "short_title",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:14160",
+   "cs": "Vzhůru do oblak",
+   "original": "Up",
+   "original_language": "en",
+   "english": "Up",
+   "year": "2009",
+   "imdb_id": "tt1049413",
+   "addon_title": "Vzhůru do oblak",
+   "addon_original_title": "Up"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Vzhůru do oblak",
+   "originaltitle": "Up",
+   "year": "2009"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Vzhůru do oblak",
+   "originaltitle": "Up",
+   "year": "2009",
+   "imdb_id": "tt1049413",
+   "tmdb_id": "14160"
+  },
+  "pool_size": 140
+ },
+ {
+  "id": "her",
+  "type": "movie",
+  "category": "short_title",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:152601",
+   "cs": "Ona",
+   "original": "Her",
+   "original_language": "en",
+   "english": "Her",
+   "year": "2013",
+   "imdb_id": "tt1798709",
+   "addon_title": "Ona",
+   "addon_original_title": "Her"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Ona",
+   "originaltitle": "Her",
+   "year": "2013"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Ona",
+   "originaltitle": "Her",
+   "year": "2013",
+   "imdb_id": "tt1798709",
+   "tmdb_id": "152601"
+  },
+  "pool_size": 152
+ },
+ {
+  "id": "joker_2019",
+  "type": "movie",
+  "category": "short_title",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:475557",
+   "cs": "Joker",
+   "original": "Joker",
+   "original_language": "en",
+   "english": "Joker",
+   "year": "2019",
+   "imdb_id": "tt7286456",
+   "addon_title": "Joker",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Joker",
+   "originaltitle": "",
+   "year": "2019"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Joker",
+   "originaltitle": "Joker",
+   "year": "2019",
+   "imdb_id": "tt7286456",
+   "tmdb_id": "475557"
+  },
+  "pool_size": 43
+ },
+ {
+  "id": "it_2017",
+  "type": "movie",
+  "category": "short_title",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:346364",
+   "cs": "To",
+   "original": "It",
+   "original_language": "en",
+   "english": "It",
+   "year": "2017",
+   "imdb_id": "tt1396484",
+   "addon_title": "To",
+   "addon_original_title": "It"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "To",
+   "originaltitle": "It",
+   "year": "2017"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "To",
+   "originaltitle": "It",
+   "year": "2017",
+   "imdb_id": "tt1396484",
+   "tmdb_id": "346364"
+  },
+  "pool_size": 137
+ },
+ {
+  "id": "se7en",
+  "type": "movie",
+  "category": "short_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:807",
+   "cs": "Sedm",
+   "original": "Se7en",
+   "original_language": "en",
+   "english": "Se7en",
+   "year": "1995",
+   "imdb_id": "tt0114369",
+   "addon_title": "Sedm",
+   "addon_original_title": "Se7en"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Sedm",
+   "originaltitle": "Se7en",
+   "year": "1995"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Sedm",
+   "originaltitle": "Se7en",
+   "year": "1995",
+   "imdb_id": "tt0114369",
+   "tmdb_id": "807"
+  },
+  "pool_size": 87
+ },
+ {
+  "id": "us_2019",
+  "type": "movie",
+  "category": "short_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:458723",
+   "cs": "My",
+   "original": "Us",
+   "original_language": "en",
+   "english": "Us",
+   "year": "2019",
+   "imdb_id": "tt6857112",
+   "addon_title": "My",
+   "addon_original_title": "Us"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "My",
+   "originaltitle": "Us",
+   "year": "2019"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "My",
+   "originaltitle": "Us",
+   "year": "2019",
+   "imdb_id": "tt6857112",
+   "tmdb_id": "458723"
+  },
+  "pool_size": 171
+ },
+ {
+  "id": "lotr_fellowship",
+  "type": "movie",
+  "category": "long_subtitle",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:120",
+   "cs": "Pán prstenů: Společenstvo Prstenu",
+   "original": "The Lord of the Rings: The Fellowship of the Ring",
+   "original_language": "en",
+   "english": "The Lord of the Rings: The Fellowship of the Ring",
+   "year": "2001",
+   "imdb_id": "tt0120737",
+   "addon_title": "Pán prstenů: Společenstvo Prstenu",
+   "addon_original_title": "The Lord of the Rings: The Fellowship of the Ring"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Pán prstenů: Společenstvo Prstenu",
+   "originaltitle": "The Lord of the Rings: The Fellowship of the Ring",
+   "year": "2001"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Pán prstenů: Společenstvo Prstenu",
+   "originaltitle": "The Lord of the Rings: The Fellowship of the Ring",
+   "year": "2001",
+   "imdb_id": "tt0120737",
+   "tmdb_id": "120"
+  },
+  "pool_size": 153
+ },
+ {
+  "id": "pirates_black_pearl",
+  "type": "movie",
+  "category": "long_subtitle",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:22",
+   "cs": "Piráti z Karibiku: Prokletí Černé perly",
+   "original": "Pirates of the Caribbean: The Curse of the Black Pearl",
+   "original_language": "en",
+   "english": "Pirates of the Caribbean: The Curse of the Black Pearl",
+   "year": "2003",
+   "imdb_id": "tt0325980",
+   "addon_title": "Piráti z Karibiku: Prokletí Černé perly",
+   "addon_original_title": "Pirates of the Caribbean: The Curse of the Black Pearl"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Piráti z Karibiku: Prokletí Černé perly",
+   "originaltitle": "Pirates of the Caribbean: The Curse of the Black Pearl",
+   "year": "2003"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Piráti z Karibiku: Prokletí Černé perly",
+   "originaltitle": "Pirates of the Caribbean: The Curse of the Black Pearl",
+   "year": "2003",
+   "imdb_id": "tt0325980",
+   "tmdb_id": "22"
+  },
+  "pool_size": 170
+ },
+ {
+  "id": "mad_max_fury_road",
+  "type": "movie",
+  "category": "long_subtitle",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:76341",
+   "cs": "Šílený Max: Zběsilá cesta",
+   "original": "Mad Max: Fury Road",
+   "original_language": "en",
+   "english": "Mad Max: Fury Road",
+   "year": "2015",
+   "imdb_id": "tt1392190",
+   "addon_title": "Šílený Max: Zběsilá cesta",
+   "addon_original_title": "Mad Max: Fury Road"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Šílený Max: Zběsilá cesta",
+   "originaltitle": "Mad Max: Fury Road",
+   "year": "2015"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Šílený Max: Zběsilá cesta",
+   "originaltitle": "Mad Max: Fury Road",
+   "year": "2015",
+   "imdb_id": "tt1392190",
+   "tmdb_id": "76341"
+  },
+  "pool_size": 139
+ },
+ {
+  "id": "spiderman_nwh",
+  "type": "movie",
+  "category": "long_subtitle",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:634649",
+   "cs": "Spider-Man: Bez domova",
+   "original": "Spider-Man: No Way Home",
+   "original_language": "en",
+   "english": "Spider-Man: No Way Home",
+   "year": "2021",
+   "imdb_id": "tt10872600",
+   "addon_title": "Spider-Man: Bez domova",
+   "addon_original_title": "Spider-Man: No Way Home"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Spider-Man: Bez domova",
+   "originaltitle": "Spider-Man: No Way Home",
+   "year": "2021"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Spider-Man: Bez domova",
+   "originaltitle": "Spider-Man: No Way Home",
+   "year": "2021",
+   "imdb_id": "tt10872600",
+   "tmdb_id": "634649"
+  },
+  "pool_size": 98
+ },
+ {
+  "id": "terminator2",
+  "type": "movie",
+  "category": "long_subtitle",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "movie:280",
+   "cs": "Terminátor 2: Den zúčtování",
+   "original": "Terminator 2: Judgment Day",
+   "original_language": "en",
+   "english": "Terminator 2: Judgment Day",
+   "year": "1991",
+   "imdb_id": "tt0103064",
+   "addon_title": "Terminátor 2: Den zúčtování",
+   "addon_original_title": "Terminator 2: Judgment Day"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Terminátor 2: Den zúčtování",
+   "originaltitle": "Terminator 2: Judgment Day",
+   "year": "1991"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Terminátor 2: Den zúčtování",
+   "originaltitle": "Terminator 2: Judgment Day",
+   "year": "1991",
+   "imdb_id": "tt0103064",
+   "tmdb_id": "280"
+  },
+  "pool_size": 94
+ },
+ {
+  "id": "got_s03e09",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:1399",
+   "show_cs": "Hra o trůny",
+   "show_original": "Game of Thrones",
+   "original_language": "en",
+   "show_english": "Game of Thrones",
+   "show_year": "2011",
+   "season": 3,
+   "episode": 9,
+   "episode_title": "Deště Kastameru",
+   "episode_title_en": "The Rains of Castamere",
+   "air_date": "2013-06-02",
+   "addon_title": "Hra o trůny",
+   "addon_original_title": "Game of Thrones"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Hra o trůny",
+   "show_originaltitle": "Game of Thrones",
+   "season": 3,
+   "episode": 9,
+   "episode_title": "Deště Kastameru"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Hra o trůny",
+   "tvshowtitle": "Hra o trůny",
+   "show_originaltitle": "Game of Thrones",
+   "season": "3",
+   "episode": "9",
+   "episode_title": "Deště Kastameru",
+   "aired": "2013-06-02",
+   "year": "2013",
+   "imdb_id": "",
+   "tmdb_id": "1399"
+  },
+  "pool_size": 220
+ },
+ {
+  "id": "breaking_bad_s05e14",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:1396",
+   "show_cs": "Perníkový táta",
+   "show_original": "Breaking Bad",
+   "original_language": "en",
+   "show_english": "Breaking Bad",
+   "show_year": "2008",
+   "season": 5,
+   "episode": 14,
+   "episode_title": "Ozymandias",
+   "episode_title_en": "Ozymandias",
+   "air_date": "2013-09-15",
+   "addon_title": "Perníkový táta",
+   "addon_original_title": "Breaking Bad"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Perníkový táta",
+   "show_originaltitle": "Breaking Bad",
+   "season": 5,
+   "episode": 14,
+   "episode_title": "Ozymandias"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Perníkový táta",
+   "tvshowtitle": "Perníkový táta",
+   "show_originaltitle": "Breaking Bad",
+   "season": "5",
+   "episode": "14",
+   "episode_title": "Ozymandias",
+   "aired": "2013-09-15",
+   "year": "2013",
+   "imdb_id": "",
+   "tmdb_id": "1396"
+  },
+  "pool_size": 176
+ },
+ {
+  "id": "friends_s02e14",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:1668",
+   "show_cs": "Přátelé",
+   "show_original": "Friends",
+   "original_language": "en",
+   "show_english": "Friends",
+   "show_year": "1994",
+   "season": 2,
+   "episode": 14,
+   "episode_title": "Domácí video",
+   "episode_title_en": "The One with the Prom Video",
+   "air_date": "1996-02-01",
+   "addon_title": "Přátelé",
+   "addon_original_title": "Friends"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Přátelé",
+   "show_originaltitle": "Friends",
+   "season": 2,
+   "episode": 14,
+   "episode_title": "Domácí video"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Přátelé",
+   "tvshowtitle": "Přátelé",
+   "show_originaltitle": "Friends",
+   "season": "2",
+   "episode": "14",
+   "episode_title": "Domácí video",
+   "aired": "1996-02-01",
+   "year": "1996",
+   "imdb_id": "",
+   "tmdb_id": "1668"
+  },
+  "pool_size": 213
+ },
+ {
+  "id": "tbbt_s03e05",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:1418",
+   "show_cs": "Teorie velkého třesku",
+   "show_original": "The Big Bang Theory",
+   "original_language": "en",
+   "show_english": "The Big Bang Theory",
+   "show_year": "2007",
+   "season": 3,
+   "episode": 5,
+   "episode_title": "Korolár hrůzostrašné polevy",
+   "episode_title_en": "The Creepy Candy Coating Corollary",
+   "air_date": "2009-10-19",
+   "addon_title": "Teorie velkého třesku",
+   "addon_original_title": "The Big Bang Theory"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Teorie velkého třesku",
+   "show_originaltitle": "The Big Bang Theory",
+   "season": 3,
+   "episode": 5,
+   "episode_title": "Korolár hrůzostrašné polevy"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Teorie velkého třesku",
+   "tvshowtitle": "Teorie velkého třesku",
+   "show_originaltitle": "The Big Bang Theory",
+   "season": "3",
+   "episode": "5",
+   "episode_title": "Korolár hrůzostrašné polevy",
+   "aired": "2009-10-19",
+   "year": "2009",
+   "imdb_id": "",
+   "tmdb_id": "1418"
+  },
+  "pool_size": 224
+ },
+ {
+  "id": "black_mirror_s03e04",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:42009",
+   "show_cs": "Černé zrcadlo",
+   "show_original": "Black Mirror",
+   "original_language": "en",
+   "show_english": "Black Mirror",
+   "show_year": "2011",
+   "season": 3,
+   "episode": 4,
+   "episode_title": "San Junipero",
+   "episode_title_en": "San Junipero",
+   "air_date": "2016-10-21",
+   "addon_title": "Černé zrcadlo",
+   "addon_original_title": "Black Mirror"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Černé zrcadlo",
+   "show_originaltitle": "Black Mirror",
+   "season": 3,
+   "episode": 4,
+   "episode_title": "San Junipero"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Černé zrcadlo",
+   "tvshowtitle": "Černé zrcadlo",
+   "show_originaltitle": "Black Mirror",
+   "season": "3",
+   "episode": "4",
+   "episode_title": "San Junipero",
+   "aired": "2016-10-21",
+   "year": "2016",
+   "imdb_id": "",
+   "tmdb_id": "42009"
+  },
+  "pool_size": 174
+ },
+ {
+  "id": "rings_of_power_s01e01",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:84773",
+   "show_cs": "Pán prstenů: Prsteny moci",
+   "show_original": "The Lord of the Rings: The Rings of Power",
+   "original_language": "en",
+   "show_english": "The Lord of the Rings: The Rings of Power",
+   "show_year": "2022",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Stín minulosti",
+   "episode_title_en": "A Shadow of the Past",
+   "air_date": "2022-09-01",
+   "addon_title": "Pán prstenů: Prsteny moci",
+   "addon_original_title": "The Lord of the Rings: The Rings of Power"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Pán prstenů: Prsteny moci",
+   "show_originaltitle": "The Lord of the Rings: The Rings of Power",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Stín minulosti"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Pán prstenů: Prsteny moci",
+   "tvshowtitle": "Pán prstenů: Prsteny moci",
+   "show_originaltitle": "The Lord of the Rings: The Rings of Power",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Stín minulosti",
+   "aired": "2022-09-01",
+   "year": "2022",
+   "imdb_id": "",
+   "tmdb_id": "84773"
+  },
+  "pool_size": 92
+ },
+ {
+  "id": "house_s04e16",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:1408",
+   "show_cs": "Dr. House",
+   "show_original": "House",
+   "original_language": "en",
+   "show_english": "House",
+   "show_year": "2004",
+   "season": 4,
+   "episode": 16,
+   "episode_title": "Houseova hlava a Wilsonovo srdce, 2. část",
+   "episode_title_en": "Wilson's Heart (2)",
+   "air_date": "2008-05-19",
+   "addon_title": "Dr. House",
+   "addon_original_title": "House"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Dr. House",
+   "show_originaltitle": "House",
+   "season": 4,
+   "episode": 16,
+   "episode_title": "Houseova hlava a Wilsonovo srdce, 2. část"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Dr. House",
+   "tvshowtitle": "Dr. House",
+   "show_originaltitle": "House",
+   "season": "4",
+   "episode": "16",
+   "episode_title": "Houseova hlava a Wilsonovo srdce, 2. část",
+   "aired": "2008-05-19",
+   "year": "2008",
+   "imdb_id": "",
+   "tmdb_id": "1408"
+  },
+  "pool_size": 145
+ },
+ {
+  "id": "stranger_things_s04e04",
+  "type": "episode",
+  "category": "episode_same_name",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:66732",
+   "show_cs": "Stranger Things",
+   "show_original": "Stranger Things",
+   "original_language": "en",
+   "show_english": "Stranger Things",
+   "show_year": "2016",
+   "season": 4,
+   "episode": 4,
+   "episode_title": "Kapitola čtvrtá: Drahý Billy",
+   "episode_title_en": "Chapter Four: Dear Billy",
+   "air_date": "2022-05-27",
+   "addon_title": "Stranger Things",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Stranger Things",
+   "show_originaltitle": "",
+   "season": 4,
+   "episode": 4,
+   "episode_title": "Kapitola čtvrtá: Drahý Billy"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Stranger Things",
+   "tvshowtitle": "Stranger Things",
+   "show_originaltitle": "Stranger Things",
+   "season": "4",
+   "episode": "4",
+   "episode_title": "Kapitola čtvrtá: Drahý Billy",
+   "aired": "2022-05-27",
+   "year": "2022",
+   "imdb_id": "",
+   "tmdb_id": "66732"
+  },
+  "pool_size": 123
+ },
+ {
+  "id": "last_of_us_s01e03",
+  "type": "episode",
+  "category": "episode_same_name",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:100088",
+   "show_cs": "The Last of Us",
+   "show_original": "The Last of Us",
+   "original_language": "en",
+   "show_english": "The Last of Us",
+   "show_year": "2023",
+   "season": 1,
+   "episode": 3,
+   "episode_title": "Long, Long Time",
+   "episode_title_en": "Long, Long Time",
+   "air_date": "2023-01-29",
+   "addon_title": "The Last of Us",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "The Last of Us",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 3,
+   "episode_title": "Long, Long Time"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "The Last of Us",
+   "tvshowtitle": "The Last of Us",
+   "show_originaltitle": "The Last of Us",
+   "season": "1",
+   "episode": "3",
+   "episode_title": "Long, Long Time",
+   "aired": "2023-01-29",
+   "year": "2023",
+   "imdb_id": "",
+   "tmdb_id": "100088"
+  },
+  "pool_size": 73
+ },
+ {
+  "id": "mandalorian_s01e03",
+  "type": "episode",
+  "category": "episode_same_name",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:82856",
+   "show_cs": "Mandalorian",
+   "show_original": "The Mandalorian",
+   "original_language": "en",
+   "show_english": "The Mandalorian",
+   "show_year": "2019",
+   "season": 1,
+   "episode": 3,
+   "episode_title": "Kapitola 3: Hřích",
+   "episode_title_en": "Chapter 3: The Sin",
+   "air_date": "2019-11-22",
+   "addon_title": "Mandalorian",
+   "addon_original_title": "The Mandalorian"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Mandalorian",
+   "show_originaltitle": "The Mandalorian",
+   "season": 1,
+   "episode": 3,
+   "episode_title": "Kapitola 3: Hřích"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Mandalorian",
+   "tvshowtitle": "Mandalorian",
+   "show_originaltitle": "The Mandalorian",
+   "season": "1",
+   "episode": "3",
+   "episode_title": "Kapitola 3: Hřích",
+   "aired": "2019-11-22",
+   "year": "2019",
+   "imdb_id": "",
+   "tmdb_id": "82856"
+  },
+  "pool_size": 243
+ },
+ {
+  "id": "dark_s01e01",
+  "type": "episode",
+  "category": "episode_other_lang",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:70523",
+   "show_cs": "Dark",
+   "show_original": "Dark",
+   "original_language": "de",
+   "show_english": "",
+   "show_year": "2017",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Tajemství",
+   "episode_title_en": "Secrets",
+   "air_date": "2017-12-01",
+   "addon_title": "Dark",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Dark",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Tajemství"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Dark",
+   "tvshowtitle": "Dark",
+   "show_originaltitle": "Dark",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Tajemství",
+   "aired": "2017-12-01",
+   "year": "2017",
+   "imdb_id": "",
+   "tmdb_id": "70523"
+  },
+  "pool_size": 148
+ },
+ {
+  "id": "money_heist_s01e01",
+  "type": "episode",
+  "category": "episode_other_lang",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:71446",
+   "show_cs": "Papírový dům",
+   "show_original": "La casa de papel",
+   "original_language": "es",
+   "show_english": "Money Heist",
+   "show_year": "2017",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. epizoda",
+   "episode_title_en": "Episode 1",
+   "air_date": "2017-05-02",
+   "addon_title": "Papírový dům",
+   "addon_original_title": "La casa de papel"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Papírový dům",
+   "show_originaltitle": "La casa de papel",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. epizoda"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Papírový dům",
+   "tvshowtitle": "Papírový dům",
+   "show_originaltitle": "La casa de papel",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "1. epizoda",
+   "aired": "2017-05-02",
+   "year": "2017",
+   "imdb_id": "",
+   "tmdb_id": "71446"
+  },
+  "pool_size": 217
+ },
+ {
+  "id": "lupin_s01e01",
+  "type": "episode",
+  "category": "episode_other_lang",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:96677",
+   "show_cs": "Lupin",
+   "show_original": "Lupin",
+   "original_language": "fr",
+   "show_english": "",
+   "show_year": "2021",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. kapitola",
+   "episode_title_en": "Chapter 1",
+   "air_date": "2021-01-08",
+   "addon_title": "Lupin",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Lupin",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. kapitola"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Lupin",
+   "tvshowtitle": "Lupin",
+   "show_originaltitle": "Lupin",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "1. kapitola",
+   "aired": "2021-01-08",
+   "year": "2021",
+   "imdb_id": "",
+   "tmdb_id": "96677"
+  },
+  "pool_size": 149
+ },
+ {
+  "id": "most_s01e01",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:85328",
+   "show_cs": "MOST!",
+   "show_original": "MOST!",
+   "original_language": "cs",
+   "show_english": "",
+   "show_year": "2019",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. epizoda",
+   "episode_title_en": "Episode 1",
+   "air_date": "2019-01-07",
+   "addon_title": "MOST!",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "MOST!",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. epizoda"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "MOST!",
+   "tvshowtitle": "MOST!",
+   "show_originaltitle": "MOST!",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "1. epizoda",
+   "aired": "2019-01-07",
+   "year": "2019",
+   "imdb_id": "",
+   "tmdb_id": "85328"
+  },
+  "pool_size": 150
+ },
+ {
+  "id": "vypravej_s01e01",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:50838",
+   "show_cs": "Vyprávěj",
+   "show_original": "Vyprávěj",
+   "original_language": "cs",
+   "show_english": "",
+   "show_year": "2009",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Od začátku",
+   "episode_title_en": "From beginning",
+   "air_date": "2009-08-31",
+   "addon_title": "Vyprávěj",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Vyprávěj",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Od začátku"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Vyprávěj",
+   "tvshowtitle": "Vyprávěj",
+   "show_originaltitle": "Vyprávěj",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Od začátku",
+   "aired": "2009-08-31",
+   "year": "2009",
+   "imdb_id": "",
+   "tmdb_id": "50838"
+  },
+  "pool_size": 161
+ },
+ {
+  "id": "arabela_s01e01",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:17784",
+   "show_cs": "Arabela",
+   "show_original": "Arabela",
+   "original_language": "cs",
+   "show_english": "",
+   "show_year": "1980",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Jak pan Majer našel zvoneček",
+   "episode_title_en": "Jak pan Majer našel zvoneček",
+   "air_date": "1980-12-25",
+   "addon_title": "Arabela",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Arabela",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Jak pan Majer našel zvoneček"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Arabela",
+   "tvshowtitle": "Arabela",
+   "show_originaltitle": "Arabela",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Jak pan Majer našel zvoneček",
+   "aired": "1980-12-25",
+   "year": "1980",
+   "imdb_id": "",
+   "tmdb_id": "17784"
+  },
+  "pool_size": 120
+ },
+ {
+  "id": "navstevnici_s01e02",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:5464",
+   "show_cs": "Návštěvníci",
+   "show_original": "Návštěvníci",
+   "original_language": "cs",
+   "show_english": "The Visitors",
+   "show_year": "1983",
+   "season": 1,
+   "episode": 2,
+   "episode_title": "Výprava do minula",
+   "episode_title_en": "Travel to the Past",
+   "air_date": "1983-11-12",
+   "addon_title": "Návštěvníci",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Návštěvníci",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 2,
+   "episode_title": "Výprava do minula"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Návštěvníci",
+   "tvshowtitle": "Návštěvníci",
+   "show_originaltitle": "Návštěvníci",
+   "season": "1",
+   "episode": "2",
+   "episode_title": "Výprava do minula",
+   "aired": "1983-11-12",
+   "year": "1983",
+   "imdb_id": "",
+   "tmdb_id": "5464"
+  },
+  "pool_size": 222
+ },
+ {
+  "id": "pripady_1_oddeleni_s01e05",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:64376",
+   "show_cs": "Případy 1. oddělení",
+   "show_original": "Případy 1. oddělení",
+   "original_language": "cs",
+   "show_english": "",
+   "show_year": "2014",
+   "season": 1,
+   "episode": 5,
+   "episode_title": "Laborant",
+   "episode_title_en": "Episode 5",
+   "air_date": "2014-02-03",
+   "addon_title": "Případy 1. oddělení",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Případy 1. oddělení",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 5,
+   "episode_title": "Laborant"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Případy 1. oddělení",
+   "tvshowtitle": "Případy 1. oddělení",
+   "show_originaltitle": "Případy 1. oddělení",
+   "season": "1",
+   "episode": "5",
+   "episode_title": "Laborant",
+   "aired": "2014-02-03",
+   "year": "2014",
+   "imdb_id": "",
+   "tmdb_id": "64376"
+  },
+  "pool_size": 122
+ },
+ {
+  "id": "kancelar_blanik_s01e01",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:63545",
+   "show_cs": "Kancelář Blaník",
+   "show_original": "Kancelář Blaník",
+   "original_language": "cs",
+   "show_english": "The Office Blanik",
+   "show_year": "2014",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Narozeniny",
+   "episode_title_en": "Episode 1",
+   "air_date": "2014-04-13",
+   "addon_title": "Kancelář Blaník",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Kancelář Blaník",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Narozeniny"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Kancelář Blaník",
+   "tvshowtitle": "Kancelář Blaník",
+   "show_originaltitle": "Kancelář Blaník",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Narozeniny",
+   "aired": "2014-04-13",
+   "year": "2014",
+   "imdb_id": "",
+   "tmdb_id": "63545"
+  },
+  "pool_size": 260
+ },
+ {
+  "id": "squid_game_s01e01",
+  "type": "episode",
+  "category": "episode_non_latin",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:93405",
+   "show_cs": "Hra na oliheň",
+   "show_original": "오징어 게임",
+   "original_language": "ko",
+   "show_english": "Squid Game",
+   "show_year": "2021",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Červená, zelená",
+   "episode_title_en": "Red Light, Green Light",
+   "air_date": "2021-09-17",
+   "addon_title": "Hra na oliheň",
+   "addon_original_title": "Squid Game"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Hra na oliheň",
+   "show_originaltitle": "Squid Game",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Červená, zelená"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Hra na oliheň",
+   "tvshowtitle": "Hra na oliheň",
+   "show_originaltitle": "오징어 게임",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Červená, zelená",
+   "aired": "2021-09-17",
+   "year": "2021",
+   "imdb_id": "",
+   "tmdb_id": "93405"
+  },
+  "pool_size": 241
+ },
+ {
+  "id": "squid_game_s02e03",
+  "type": "episode",
+  "category": "episode_non_latin",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:93405",
+   "show_cs": "Hra na oliheň",
+   "show_original": "오징어 게임",
+   "original_language": "ko",
+   "show_english": "Squid Game",
+   "show_year": "2021",
+   "season": 2,
+   "episode": 3,
+   "episode_title": "001",
+   "episode_title_en": "001",
+   "air_date": "2024-12-26",
+   "addon_title": "Hra na oliheň",
+   "addon_original_title": "Squid Game"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Hra na oliheň",
+   "show_originaltitle": "Squid Game",
+   "season": 2,
+   "episode": 3,
+   "episode_title": "001"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Hra na oliheň",
+   "tvshowtitle": "Hra na oliheň",
+   "show_originaltitle": "오징어 게임",
+   "season": "2",
+   "episode": "3",
+   "episode_title": "001",
+   "aired": "2024-12-26",
+   "year": "2024",
+   "imdb_id": "",
+   "tmdb_id": "93405"
+  },
+  "pool_size": 276
+ },
+ {
+  "id": "attack_on_titan_s01e01",
+  "type": "episode",
+  "category": "episode_non_latin",
+  "split": "train",
+  "metadata": {
+   "tmdb_id": "tv:1429",
+   "show_cs": "Šingeki no kjodžin",
+   "show_original": "進撃の巨人",
+   "original_language": "ja",
+   "show_english": "Attack on Titan",
+   "show_year": "2013",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Pád Šiganšiny, část 1 - Tobě, dva tisíce let poté",
+   "episode_title_en": "To You, in 2000 Years: The Fall of Shiganshina (1)",
+   "air_date": "2013-04-07",
+   "addon_title": "Šingeki no kjodžin",
+   "addon_original_title": "Attack on Titan"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Šingeki no kjodžin",
+   "show_originaltitle": "Attack on Titan",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Pád Šiganšiny, část 1 - Tobě, dva tisíce let poté"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Šingeki no kjodžin",
+   "tvshowtitle": "Šingeki no kjodžin",
+   "show_originaltitle": "進撃の巨人",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Pád Šiganšiny, část 1 - Tobě, dva tisíce let poté",
+   "aired": "2013-04-07",
+   "year": "2013",
+   "imdb_id": "",
+   "tmdb_id": "1429"
+  },
+  "pool_size": 324
+ },
+ {
+  "id": "alice_borderland_s01e01",
+  "type": "episode",
+  "category": "episode_non_latin",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:110316",
+   "show_cs": "Alice in Borderland",
+   "show_original": "今際の国のアリス",
+   "original_language": "ja",
+   "show_english": "Alice in Borderland",
+   "show_year": "2020",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. díl",
+   "episode_title_en": "Episode 1",
+   "air_date": "2020-12-10",
+   "addon_title": "Alice in Borderland",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Alice in Borderland",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. díl"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Alice in Borderland",
+   "tvshowtitle": "Alice in Borderland",
+   "show_originaltitle": "今際の国のアリス",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "1. díl",
+   "aired": "2020-12-10",
+   "year": "2020",
+   "imdb_id": "",
+   "tmdb_id": "110316"
+  },
+  "pool_size": 188
+ }
+]
