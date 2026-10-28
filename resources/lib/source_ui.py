@@ -60,6 +60,35 @@ def _languages_from_text(text: str) -> List[str]:
     return langs
 
 
+def _cs_is_language(match: "re.Match[str]", tag_word: str) -> bool:
+    """Whether a whole-word "cs" in a lowered name is the language code (see detect_languages)."""
+    before, after = match.string[:match.start()], match.string[match.end():]
+    sep = r"[\s._\-]"
+    code = r"(?:cz|cze|sk|en|eng)"
+    if (re.search(r"(?<![a-z0-9])" + tag_word + sep + r"+$", before)
+            or re.match(sep + r"*" + tag_word + r"(?![a-z0-9])", after)):
+        return True
+    if re.search(r"(?<![a-z0-9])" + code + r"\s*[+,]\s*$", before) or re.match(r"\s*[+,]\s*" + code + r"(?![a-z0-9])", after):
+        return True
+    # "[CS]" and a "CS" alone between two bracket groups. In a "+" or "," list inside brackets ("(CS, EN)",
+    # "(EN 5.1 + komentar + CS)") only when the same bracket group names another language, so "(Drama, CS)"
+    # or "(CS, 1080p)" stay words.
+    left = "open" if re.search(r"[(\[]$", before) else "close" if re.search(r"[)\]]\s*$", before) else (
+        "list" if re.search(r"[+,]\s*$", before) else "")
+    right = "close" if re.match(r"[)\]]", after) else "open" if re.match(r"\s*[(\[]", after) else (
+        "list" if re.match(r"\s*[+,]", after) else "")
+    if (left, right) in (("open", "close"), ("close", "open")):
+        return True
+    group_code = r"(?<![a-z0-9])(?:cz|cze|sk|en|eng|ja|jap)(?![a-z])"  # also "EN5.1"
+    if (left, right) == ("open", "list"):
+        group = re.match(r"[^()\[\]]*[)\]]", after)
+    elif (left, right) == ("list", "close"):
+        group = re.search(r"[(\[][^()\[\]]*$", before)
+    else:
+        return False
+    return bool(group and re.search(group_code, group.group()))
+
+
 def ellipsize(text: Any, max_length: int) -> str:
     value = _clean_text(text)
     if max_length <= 0 or len(value) <= max_length:
@@ -154,6 +183,13 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
     # A track count glued to the code ("2xCZ", "4xEN-4xCZ", "CZE3x") still names the audio language.
     lowered = re.sub(r"(?<![a-z0-9])\d+x(?=(?:cz|cze|sk|en|eng)(?![a-z]))", " ", lowered)
     lowered = re.sub(r"(?<![a-z0-9])(cz|cze|sk|en|eng)\d+x(?![a-z0-9])", r"\1", lowered)
+    audio_word = r"(?:audio|dub(?:bing|bed|s)?|dab(?:ing|ink)?u?)"
+    subtitle_word = r"(?:titulk\w*|tit|sub(?:s|bed)?|subt(?:i\w*)?)"
+    tag_word = "(?:" + audio_word + "|" + subtitle_word + ")"
+    # The ISO code "cs" is also a common abbreviation, so it is Czech only where it is clearly a language tag:
+    # next to a tag word ("CS dabing", "CS.SUB"), in a list with another code ("EN+CS") or set apart by
+    # brackets ("[CS]", "(EN 5.1 + komentar + CS)", "(2011) CS (1080p)"). A "cs" between dashes or dots stays a word.
+    lowered = re.sub(r"(?<![a-z0-9])cs(?![a-z0-9])", lambda m: "cz" if _cs_is_language(m, tag_word) else "cs", lowered)
     # "spaced" keeps "+" and "," for language lists, "normalized" is the same text without "+" (same length).
     spaced = re.sub(r"[._\-\[\]()]", " ", lowered)
     normalized = spaced.replace("+", " ")
@@ -168,6 +204,15 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
 
     def consume(start: int, end: int) -> None:
         bare[start:end] = "#" * (end - start)
+
+    # A code glued to the tag word ("CZdab", "CzAudio", "CZtit", "ENsubs") belongs to that word, even next to
+    # another tag ("[ENsubs](Dual Audio)"). Only a code at the start of a word and a whole tag word, so words
+    # like "Entity" or "Czardas" stay words.
+    glued = r"(?<!\w)(?P<lang>cz|cze|sk|en|eng)(?:(?P<subs>" + subtitle_word + ")|" + audio_word + r")(?!\w)"
+    for match in re.finditer(glued, "".join(bare), re.IGNORECASE):
+        for lang in _languages_from_text(match.group("lang")):
+            _append_unique(subtitle_langs if match.group("subs") else audio_langs, lang)
+        consume(*match.span())
 
     # A list of languages joined by "+" or "," next to the dub word ("CZ+EN Dabing", "audio.EN,CZ") is all dubs,
     # even if one of them also has subtitles ("[CZ+EN Dabing] [CZ Titulky]").
@@ -211,18 +256,32 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
     # audio), the other side only when the preferred one has none ("TIT CZ", "CZ subs"). A code already read as
     # the dub stays the dub. "tit" and "subt" are common short forms ("CZ.tit", "cz-tit", "subt.CZ"), only as
     # whole words, so "Petit CZ" or "subtle CZ" keep CZ as audio.
-    sub_lang_before = r"(?<!\w)(?P<lang>cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english)\s+$"
-    sub_lang_after = r"\s+(?P<lang>cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|jap|japanese)(?!\w)"
+    # A list joined by "+" or "," on that side is all subtitles ("CZ+EN titulky", "CZ, EN tit", "subt CZ,EN"),
+    # unless it names one language twice ("CZ + cz tit" is the audio and then the subtitles) or the list before
+    # the word is joined to a dub phrase ("CZ dabing + EN, CZ titulky", "CZ audio + EN, CZ sub": EN is a second
+    # audio track). Then the word takes only the nearest code.
+    dub_joined = r"(?<!\w)" + audio_word + r"\s*[+,]\s*$"
+    before_code = r"(?:cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english)"
+    after_code = r"(?:cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|jap|japanese)"
+    sub_lang_before = r"(?<!\w)(?P<lang>{0}(?:\s*[+,]\s*{0})*)[\s+]+$".format(before_code)
+    sub_lang_after = r"[\s+]+(?P<lang>{0}(?:\s*[+,]\s*{0})*)(?!\w)".format(after_code)
     for word in re.finditer(r"(?<!\w)(?:(?P<cs>titulk\w*|tit)|(?:hard|soft)?sub(?:s|bed)?|subt(?:i\w*)?)(?!\w)", unread(), re.IGNORECASE):
-        current = unread()
+        current = "".join(bare)
         before = re.search(sub_lang_before, current[:word.start()], re.IGNORECASE)
         after = re.match(sub_lang_after, current[word.end():], re.IGNORECASE)
-        sides = ((0, before), (word.end(), after)) if word.group("cs") else ((word.end(), after), (0, before))
-        offset, match = next(((start, found) for start, found in sides if found), (0, None))
+        sides = ((0, before, -1), (word.end(), after, 0)) if word.group("cs") else ((word.end(), after, 0), (0, before, -1))
+        offset, match, nearest = next(((start, found, near) for start, found, near in sides if found), (0, None, 0))
         if match:
-            for lang in _languages_from_text(match.group("lang")):
-                _append_unique(subtitle_langs, lang)
-            consume(offset + match.start("lang"), offset + match.end("lang"))
+            start = offset + match.start("lang")
+            items = [(start + item.start(), start + item.end(), _languages_from_text(item.group()))
+                     for item in re.finditer(r"[^\s+,]+", match.group("lang"))]
+            codes = [code for _, _, langs in items for code in langs]
+            if len(set(codes)) < len(codes) or (nearest and re.search(dub_joined, current[:items[0][0]], re.IGNORECASE)):
+                items = [items[nearest]]
+            for item_start, item_end, langs in items:
+                for lang in langs:
+                    _append_unique(subtitle_langs, lang)
+                consume(item_start, item_end)
 
     embedded_subs = re.search(r"(?:vlo[zž]en[éeýy]?|embedded\s+subs?)", normalized, re.IGNORECASE)
     if embedded_subs:

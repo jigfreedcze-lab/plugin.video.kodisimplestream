@@ -103,6 +103,75 @@ def test_subtitle_word_takes_one_language():
     assert detect_languages("Film.2020.CZ.subs.mkv") == ([], ["CZ"])
 
 
+def test_language_list_next_to_subtitle_word():
+    # seznam jazyků u slova titulků jsou celý titulky, žádný jazyk z něj není dabing
+    assert detect_languages("Film.2020.1080p.CZ+EN.titulky.mkv") == ([], ["CZ", "EN"])
+    assert detect_languages("Film.2020.subt.CZ,EN.mkv") == ([], ["CZ", "EN"])
+    assert detect_languages("Film 2020 720p CZ, EN tit.mkv") == ([], ["CZ", "EN"])
+    assert detect_languages("Film (2020) {SK, CZ, EN Subs}.mkv") == ([], ["SK", "CZ", "EN"])
+    assert detect_languages("Film.2020.EN.Subs-CZ,EN.mkv") == (["EN"], ["CZ", "EN"])
+    assert detect_languages("Film (2020) JA dab - titulky EN, SK, 720p.mkv") == (["JA"], ["EN", "SK"])
+    assert detect_languages("Film.2020.audio-EN,CZ.subt-EN,CZ.mkv") == (["CZ", "EN"], ["EN", "CZ"])
+    assert detect_languages("Film (2020) CZ dab 5.1 + EN 2.0 + CZ ,EN tit.mkv") == (["CZ", "EN"], ["CZ", "EN"])
+    assert detect_languages("Film 2020 5.1 CZ, 2.0 FR, tit.CZ, ENG, 720p.avi") == (["CZ"], ["CZ", "EN"])
+    # stejný jazyk dvakrát není seznam: první je zvuk, druhý titulky
+    assert detect_languages("Film 2020 CZ, cz tit.mkv") == (["CZ"], ["CZ"])
+    assert detect_languages("Film 2020 CZE +CZ titulky.avi") == (["CZ"], ["CZ"])
+    # kodek nebo kanály vedle seznamu jsou jen pořadí značek, seznam zůstává titulky
+    assert detect_languages("Film.2020.720p.AAC.CZ+EN.titulky.mkv") == ([], ["CZ", "EN"])
+    assert detect_languages("Film 2020 1080p 5.1 EN, CZ titulky.mkv") == ([], ["EN", "CZ"])
+    assert detect_languages("Film.2020.subt.EN,CZ.AC3.mkv") == ([], ["EN", "CZ"])
+    # seznam napojený „+“ nebo „,“ na dabing: vzdálený kód je druhá zvuková stopa, titulky jen ten u slova
+    assert detect_languages("Film 2020 CZ dabing + EN, CZ titulky.mkv") == (["CZ", "EN"], ["CZ"])
+    assert detect_languages("Film 2020 CZ audio + EN, CZ sub.mkv") == (["CZ", "EN"], ["CZ"])
+    assert detect_languages("Film 2020 (CZ dabing) + (EN, CZ titulky).mkv") == (["CZ", "EN"], ["CZ"])
+    # jazyky oddělené jen mezerou dál nejsou seznam
+    assert detect_languages("Film.2020.EN.CZ.titulky.mkv") == (["EN"], ["CZ"])
+
+
+def test_language_glued_to_tag_word():
+    assert detect_languages("Film.2020.CZdab.mkv") == (["CZ"], [])
+    assert detect_languages("Film (2020) CZdabing 720p.avi") == (["CZ"], [])
+    assert detect_languages("Film_2020_SKdabingu.avi") == (["SK"], [])
+    assert detect_languages("Film.2020.XviD.czdub.avi") == (["CZ"], [])
+    assert detect_languages("Film.S01E01.1080p.x264-GRP (CzAudio).mkv") == (["CZ"], [])
+    assert detect_languages("Film.S01E01.1080p.CZtit.mkv") == ([], ["CZ"])
+    assert detect_languages("Film.2020.CZtitulky.720p.avi") == ([], ["CZ"])
+    assert detect_languages("Film.2020.CZsub.HDTV.720p.avi") == ([], ["CZ"])
+    assert detect_languages("Film.2020.ENsubs.mkv") == ([], ["EN"])
+    assert detect_languages("Film.2020.EN-CZsubs_720p.avi") == (["EN"], ["CZ"])
+    assert detect_languages("Film.2020.FRdub.CZtit.mkv") == ([], ["CZ"])
+    assert detect_languages("Film.2020.En.2.0.CzDub.avi") == (["CZ", "EN"], [])
+    # přilepený jazyk patří svému slovu, i když vedle stojí jiná značka
+    assert detect_languages("Show 01 [ENsubs](Dual Audio).avi") == ([], ["EN"])
+    # kód jen na začátku slova a jen s celým slovem značky
+    assert detect_languages("Entity.2020.CZ.mkv") == (["CZ"], [])
+    assert detect_languages("Czardas.2020.1080p.mkv") == ([], [])
+    assert detect_languages("Film.Encz.subtitle.mkv") == ([], [])
+    assert detect_languages("Film.2020.Endubai.mkv") == ([], [])
+
+
+def test_iso_code_cs():
+    # „CS“ je čeština jen tam, kde je zjevně značkou jazyka
+    assert detect_languages("Film (2011) CS (1080p).mp4") == (["CZ"], [])
+    assert detect_languages("Film.2020.[CS].HDTV.avi") == (["CZ"], [])
+    assert detect_languages("Film 2020 (720p) (EN 5.1 + komentar + CS).avi") == (["CZ", "EN"], [])
+    assert detect_languages("Film.2020.EN+CS.1080p.mkv") == (["CZ", "EN"], [])
+    assert detect_languages("Film-2020-CS-dabing.mkv") == (["CZ"], [])
+    assert detect_languages("Film.S01E01.CS.SUB.720p.avi") == ([], ["CZ"])
+    # jinde je „cs“ běžná zkratka
+    assert detect_languages("Film-2-CS-show-2020.avi") == ([], [])
+    assert detect_languages("Film.2020.cs-verze.1080p.mkv") == ([], [])
+    assert detect_languages("Film.CS.GO.Tournament.2020.mkv") == ([], [])
+    assert detect_languages("C.S.Lewis.Story.2020.mkv") == ([], [])
+    # seznam v závorce jen s dalším kódem jazyka ve stejné závorce
+    assert detect_languages("Film 2020 (CS, EN).mkv") == (["CZ", "EN"], [])
+    assert detect_languages("Film 2020 (1080p)(EN5.1+komentar+CS).mkv")[0] == ["CZ"]
+    assert detect_languages("Film 2020 (Drama, CS) 1080p.mkv") == ([], [])
+    assert detect_languages("Film 2020 (CS, 1080p).mkv") == ([], [])
+    assert detect_languages("Film 2020 [CS, Komedie].mkv") == ([], [])
+
+
 def test_language_code_boundaries():
     # kód jazyka jen jako celé slovo: „cze“ není „cz“ + zbytek, „czar“ není jazyk
     assert detect_languages("Film.subti.CZE.mkv") == ([], ["CZ"])
