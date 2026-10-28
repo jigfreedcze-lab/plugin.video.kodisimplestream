@@ -60,7 +60,7 @@ def _shared_context_adapter():
 
     return SharedContextAdapter()
 
-def _shared_session():
+def shared_session():
     """
     One session per process. Webshare answers "Connection: close", so keep-alive does not help,
     but the connections share the SSL context instead of loading the CA bundle each time.
@@ -88,7 +88,7 @@ class WebshareAPI:
         self._base_url = "https://webshare.cz/api/"
         self._headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'}
         self._token = ""
-        self._session = _shared_session()
+        self._session = shared_session()
 
     @property
     def token(self) -> str:

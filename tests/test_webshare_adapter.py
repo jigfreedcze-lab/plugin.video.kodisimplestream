@@ -55,7 +55,7 @@ assert verified(adapter, proxy_pool, True) == verified(base, base_proxy_pool, Tr
 
 # 4. sdílená session: adaptér jen bez předem načteného kontextu (requests < 2.32), cookie neukládá
 ws._session = None
-session = ws._shared_session()
+session = ws.shared_session()
 preloaded = getattr(requests.adapters, "_preloaded_ssl_context", None) is not None
 assert isinstance(session.get_adapter(URL), HTTPAdapter)
 assert (type(session.get_adapter(URL)).__name__ == "SharedContextAdapter") is not preloaded

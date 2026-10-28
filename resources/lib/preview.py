@@ -193,12 +193,17 @@ def load_frames(stripe_url: str, count: int, folder: str) -> List[str]:
     return split_stripe(_download(stripe_url), count, folder)
 
 
+def _http():
+    """The Webshare session shared with the searches: one SSL context per process (see webshare.py)."""
+    from resources.lib.webshare import shared_session
+
+    return shared_session()
+
+
 def _download(url: str) -> bytes:
     """The stripe bytes; redirects are followed by hand so that every hop is checked by is_stripe_url."""
-    import requests
-
     for _ in range(MAX_REDIRECTS + 1):
-        with requests.get(url, timeout=DOWNLOAD_TIMEOUT, stream=True, allow_redirects=False) as response:
+        with _http().get(url, timeout=DOWNLOAD_TIMEOUT, stream=True, allow_redirects=False) as response:
             if response.is_redirect:
                 url = urljoin(url, response.headers.get("Location", ""))
                 if not is_stripe_url(url):
@@ -245,10 +250,8 @@ def parse_file_info(data: bytes) -> Optional[Dict[str, Any]]:
 
 def fetch_file_info(ident: str) -> Optional[Dict[str, Any]]:
     """Anonymous file_info request (no token): POST with the ident only, size and time capped."""
-    import requests
-
     deadline = time.monotonic() + FILE_INFO_WAIT
-    with requests.post(FILE_INFO_URL, data={"ident": ident}, timeout=FILE_INFO_TIMEOUT,
+    with _http().post(FILE_INFO_URL, data={"ident": ident}, timeout=FILE_INFO_TIMEOUT,
                        stream=True, allow_redirects=False) as response:
         if response.status_code != 200:
             raise ValueError(f"file_info HTTP {response.status_code}")

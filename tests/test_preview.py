@@ -136,6 +136,7 @@ sys.modules["xbmcplugin"] = types.SimpleNamespace(
 sys.argv = ["plugin://plugin.video.kodisimplestream/", "-1", ""]
 import kodisimplestream as k
 from resources.lib import preview
+preview._http = lambda: requests_stub  # the shared Webshare session in Kodi
 # Pillow is imported only when a preview is cut: without it (some Linux builds) the plugin must still load
 assert not any(name == "PIL" or name.startswith("PIL.") for name in sys.modules), "PIL imported with the plugin"
 
