@@ -1,5 +1,5 @@
-![Version](https://img.shields.io/github/v/tag/Kecerim24/plugin.video.kodisimplestream?label=version&logo=github)
-![License](https://img.shields.io/github/license/Kecerim24/plugin.video.kodisimplestream)
+![Version](https://img.shields.io/github/v/tag/jigfreedcze-lab/plugin.video.kodisimplestream?label=version&logo=github)
+![License](https://img.shields.io/github/license/jigfreedcze-lab/plugin.video.kodisimplestream)
 
 # KodiSimpleStream - Kodi Plugin pro Webshare.cz
 
@@ -51,9 +51,10 @@ Testy: `python tests/run_tests.py`
 ### TMDb API klíč (volitelné)
 Hledání filmů a seriálů (české názvy, plakáty, řady a epizody) používá databázi [TMDB](https://www.themoviedb.org). Bez klíče doplněk funguje dál, jen v menu místo hledání filmů a seriálů najdete položku *Zapnout hledání filmů a seriálů (TMDb)…* s krátkým návodem.
 
-Klíč je zdarma a vyřízení trvá pár minut. Každý uživatel si zakládá vlastní – doplněk žádný sdílený klíč neobsahuje.
+> **Nechcete zakládat klíč?** Filmy a seriály můžete procházet v doplňku TMDb Helper a KodiSimpleStream použít jen k přehrání (viz [TMDb Helper integrace](#tmdb-helper-integrace)). Postup níže pak nepotřebujete.
 
-Bez vlastního klíče můžete filmy a seriály procházet v doplňku TMDb Helper, který KodiSimpleStream použije k přehrání (viz [TMDb Helper integrace](#tmdb-helper-integrace)).
+#### Jak získat vlastní klíč
+Klíč je zdarma a vyřízení trvá pár minut. Každý uživatel si zakládá vlastní – doplněk žádný sdílený klíč neobsahuje.
 
 1. Založte si účet na [themoviedb.org/signup](https://www.themoviedb.org/signup) a potvrďte e-mail.
 2. Otevřete [Nastavení → API](https://www.themoviedb.org/settings/api) a klikněte na **Create** (případně *Request an API Key*).
@@ -87,10 +88,10 @@ This product uses TMDB and the TMDB APIs but is not endorsed, certified, or othe
 
 ### Podpora
 Pokud narazíte na problémy nebo máte otázky:
-- Prohlédněte si [Issues](https://github.com/Kecerim24/plugin.video.kodisimplestream/issues)
+- Prohlédněte si [Issues](https://github.com/jigfreedcze-lab/plugin.video.kodisimplestream/issues)
 - Vytvořte nový problém, pokud váš problém ještě nebyl nahlášen
 
-Máte-li nápad na vylepšení doplňku, neváhejte ho sdílet v sekci Issues nebo rovnou přispět vlastním kódem prostřednictvím Pull requestu (pomoc bych velmi ocenil, jelikož to je můj první addon pro Kodi). Veškeré návrhy na zlepšení jsou vítány!
+Nápady na vylepšení i opravy jsou vítány – založte Issue nebo rovnou pošlete Pull request.
 
 ### TMDb Helper integrace
 1. Zkopírujte soubor `docs/tmdbhelper/kodisimplestream.json` do:
