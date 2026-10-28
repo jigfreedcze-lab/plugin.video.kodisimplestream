@@ -8,10 +8,13 @@ from __future__ import annotations  # Enables forward references in older Python
 
 # Kodi plugin boilerplate and plugin-specific modules
 import ast
+import hashlib
 import json
 import os
+import ssl
 import sys
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 import re
 from urllib.parse import parse_qsl, urlencode
@@ -21,7 +24,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 
-from resources.lib.webshare import WebshareAPI
+from resources.lib.webshare import WebshareAPI, WebshareError, WebshareStatusError
 from resources.lib.tmdb import TMDB, TMDBAuthError
 from resources.lib.source_ui import (
     compact_label,
@@ -112,34 +115,64 @@ def _source_label(source: Dict[str, Any], image: str = "") -> str:
         title = f"[{quality}] {title}"
     return title
 
-def get_api() -> Optional[WebshareAPI]:
-    """
-    Returns an authenticated instance of WebshareAPI.
-    Shows error notification on failure.
-    """
+def get_api() -> WebshareAPI:
+    """Returns the Webshare client of this plugin call. Searching needs no login, see login_api()."""
     global _api
 
-    if _api is not None:
-        return _api
+    if _api is None:
+        # TLS setup is the slow part of every request, its speed differs a lot between platforms
+        xbmc.log(f"[KodiSimpleStream] {ssl.OPENSSL_VERSION}", xbmc.LOGDEBUG)
+        _api = WebshareAPI()
+    return _api
 
+def _credentials() -> Optional[Tuple[str, str]]:
+    """Returns the Webshare user name and password, None after asking the user to enter them."""
     username: str = _addon.getSetting("username")
     password: str = _addon.getSetting("password")
+    if username and password:
+        return username, password
+    xbmcgui.Dialog().notification(
+        _addon.getAddonInfo("name"),
+        _addon.getLocalizedString(30009),  # "Please enter username and password…"
+        xbmcgui.NOTIFICATION_ERROR,
+        5000,
+    )
+    return None
 
-    if not (username and password):
-        xbmcgui.Dialog().notification(
-            _addon.getAddonInfo("name"),
-            _addon.getLocalizedString(30009),  # "Please enter username and password…"
-            xbmcgui.NOTIFICATION_ERROR,
-            5000,
-        )
-        return None
+# Window property with the login token, shared by the plugin calls (separate processes) of one Kodi session
+TOKEN_PROPERTY = "kodisimplestream.wst"
+# Not verified live that file_link rejects a revoked token with an error status (and so triggers a new
+# login) – it might hand out a slow non-VIP link instead, so a cached token is used for a limited time only
+TOKEN_MAX_AGE = 30 * 60
+
+def login_api(reuse_token: bool = True) -> Tuple[Optional[WebshareAPI], bool]:
+    """
+    Returns the Webshare client with a login token and whether the token was reused from an earlier call.
+    Playback then usually needs just the file_link request. reuse_token=False logs in again.
+    The client is None after notifying the user (missing credentials, failed login).
+    """
+    credentials = _credentials()
+    if not credentials:
+        return None, False
+    username, password = credentials
+    api = get_api()
+    window = xbmcgui.Window(10000)
+    # The cached token belongs to one account – another user name logs in again
+    account = hashlib.sha1(username.encode("utf-8")).hexdigest()[:16]
+    if reuse_token:
+        cached_account, _, rest = window.getProperty(TOKEN_PROPERTY).partition(":")
+        saved, _, token = rest.partition(":")
+        try:
+            fresh = 0 <= time.time() - int(saved) < TOKEN_MAX_AGE
+        except ValueError:
+            fresh = False
+        if token and fresh and cached_account == account:
+            api.set_token(token)
+            return api, True
+    window.clearProperty(TOKEN_PROPERTY)
 
     try:
-        _api = WebshareAPI()
-        _api.login(username, password)
-        if not getattr(_api, "_token", ""):
-            raise RuntimeError("Webshare returned an empty token – check credentials.")
-        return _api
+        api.login(username, password)
     except Exception as exc:
         xbmcgui.Dialog().notification(
             _addon.getAddonInfo("name"),
@@ -147,7 +180,9 @@ def get_api() -> Optional[WebshareAPI]:
             xbmcgui.NOTIFICATION_ERROR,
             5000,
         )
-        return None
+        return None, False
+    window.setProperty(TOKEN_PROPERTY, f"{account}:{int(time.time())}:{api.token}")
+    return api, False
 
 def get_tmdb() -> Optional[TMDB]:
     """
@@ -264,21 +299,23 @@ def list_search_results(
     match: TMDb metadata (see matching.py) – in the best match order the results are sorted
     by the match score like in the TMDb Helper flow.
     """
-    api = get_api()
-    if not api:
-        return
     if sort is None or not 0 <= sort < len(SORT_VALUES):
         sort = default_sort()
     offset = max(0, offset)
 
     try:
+        api = get_api()
         seen = set()
         rows = []
         pages = []
         has_more = False
         next_offset = offset + PAGE_SIZE
-        for term in search_terms:
-            response = api.search(term, limit=PAGE_SIZE, offset=offset, sort=SORT_VALUES[sort])["response"]
+        # Parallel requests, the responses keep the order of the terms (rank_files depends on it)
+        responses = api.search_all(search_terms, limit=PAGE_SIZE, offset=offset, sort=SORT_VALUES[sort])
+        for response in responses:
+            if isinstance(response, Exception):
+                raise response
+            response = response["response"]
             files = _as_list(response.get("file"))
             pages.append(files)
             # "total" is unreliable for small result sets, trust it only after a full page
@@ -369,6 +406,7 @@ def list_search_results(
             xbmcgui.NOTIFICATION_ERROR,
             5000,
         )
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
 
 def choose_sort(search_terms: List[str], current: int, match: Optional[Dict[str, Any]] = None) -> None:
     """Lets the user pick a different order for the current search and reloads the list."""
@@ -561,11 +599,9 @@ def _prefer_quality_value(name: str) -> int:
     return base if base >= 3 else 0
 
 
-def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] = None) -> List[Dict[str, Any]]:
-    api = get_api()
-    if not api:
-        return []
-
+def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
+    """Searches Webshare for TMDb Helper and scores the files, best first.
+    None when no query got an answer from Webshare (the user was notified)."""
     queries = [search_query] if search_query else build_tmdbh_queries(params)
     if not queries:
         return []
@@ -576,13 +612,19 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
 
     xbmc.log(f"[KodiSimpleStream] TMDbH queries: {queries}", xbmc.LOGINFO)
 
-    for term in queries:
-        try:
-            # Best-match order: search words are OR-ed, other orders bring files sharing just one word
-            response = api.search(term, sort="").get("response", {})
-        except Exception as exc:
-            xbmc.log(f"[KodiSimpleStream] search failed for term '{term}': {exc}", xbmc.LOGWARNING)
+    # Best-match order: search words are OR-ed, other orders bring files sharing just one word.
+    # Parallel requests, merged in the order of the queries like before.
+    try:
+        responses = get_api().search_all(queries, sort="")
+    except Exception as exc:  # the client setup (TLS context) failed, reported like failed queries
+        responses = [exc] * len(queries)
+    errors = []
+    for term, response in zip(queries, responses):
+        if isinstance(response, Exception):
+            xbmc.log(f"[KodiSimpleStream] search failed for term '{term}': {response}", xbmc.LOGWARNING)
+            errors.append(response)
             continue
+        response = response.get("response", {})
 
         files = response.get("file", [])
         if isinstance(files, dict):
@@ -617,6 +659,16 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
             if prev is None or item["score"] > prev["score"]:
                 merged[ident] = item
 
+    if len(errors) == len(queries):
+        # Not "no sources" – Webshare did not answer (timeout, no connection)
+        xbmcgui.Dialog().notification(
+            _addon.getAddonInfo("name"),
+            _addon.getLocalizedString(30007).format(str(errors[0])),
+            xbmcgui.NOTIFICATION_ERROR,
+            5000,
+        )
+        return None
+
     preference = language_preference()
     sorted_items = sorted(
         merged.values(),
@@ -639,19 +691,33 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
 
 def play_ident(ident: str) -> None:
     """Asks Webshare for the download link only when the file is played."""
-    api = get_api()
-    if not api:
-        xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
-        return
-    try:
-        video_url = api.get_download_link(ident)
-    except Exception as exc:
-        xbmc.log(f"[KodiSimpleStream] file_link failed for {ident}: {exc}", xbmc.LOGWARNING)
-        video_url = ""
+    video_url = ""
+    reason = ""  # why there is no link, for the notification
+    for reuse_token in (True, False):
+        api, reused = login_api(reuse_token)
+        if not api:
+            xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+            return
+        try:
+            video_url = api.get_download_link(ident)
+        except WebshareStatusError as exc:
+            xbmc.log(f"[KodiSimpleStream] file_link failed for {ident}: {exc}", xbmc.LOGWARNING)
+            # Webshare's own words, e.g. "File temporarily unavailable."
+            reason = f"Webshare: {exc.message}" if exc.message else ""
+        except Exception as exc:
+            # Connection error or timeout – a new login would not help
+            xbmc.log(f"[KodiSimpleStream] file_link failed for {ident}: {exc}", xbmc.LOGWARNING)
+            # WebshareError texts are short ("Webshare did not respond in time"), anything else is not shown
+            reason = str(exc) if isinstance(exc, WebshareError) else ""
+            break
+        if video_url or not reused:
+            break
+        # The token cached by an earlier call may have expired (error status or an empty link) – log in
+        # again, only once (the second pass does not reuse the token)
     if not video_url:
         xbmcgui.Dialog().notification(
             _addon.getAddonInfo("name"),
-            _addon.getLocalizedString(30040),  # "Webshare returned no download link"
+            reason or _addon.getLocalizedString(30040),  # "Webshare returned no download link"
             xbmcgui.NOTIFICATION_ERROR,
             5000,
         )
@@ -713,19 +779,25 @@ def prompt_change_search(current_query: str) -> Optional[str]:
     return new_query
 
 
-def select_tmdbh_source(params: Dict[str, Any]) -> None:
-    """Shows a modal source picker for TMDb Helper and resolves the selected item."""
+def select_tmdbh_source(params: Dict[str, Any], results: Optional[List[Dict[str, Any]]] = None) -> None:
+    """Shows a modal source picker for TMDb Helper and resolves the selected item.
+    results: already found sources for the primary queries (play_best_tmdbh_source), searched again only for a new query."""
     current_query = _primary_tmdbh_query(params)
     active_query: Optional[str] = None
 
     while True:
-        results = search_and_score_tmdbh(params, active_query)
+        if results is None:
+            results = search_and_score_tmdbh(params, active_query)
+            if results is None:
+                xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+                return
         if not results:
             xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
             new_query = prompt_change_search(current_query)
             if new_query:
                 current_query = new_query
                 active_query = new_query
+                results = None
                 continue
             xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
             return
@@ -745,6 +817,8 @@ def select_tmdbh_source(params: Dict[str, Any]) -> None:
             if new_query:
                 current_query = new_query
                 active_query = new_query
+                results = None
+            # Cancelled change shows the same sources again
             continue
 
         chosen = results[selected - 1]
@@ -754,11 +828,12 @@ def select_tmdbh_source(params: Dict[str, Any]) -> None:
 
 
 def list_tmdbh_sources(params: Dict[str, Any]) -> None:
-    # Without a Webshare login get_api() already told the user, "no sources" would be misleading
-    if not get_api():
+    # Searching needs no login, playing an item asks for it (play_ident)
+    results = search_and_score_tmdbh(params)
+    if results is None:
+        # Webshare did not answer, the user was notified – "no sources" would be misleading
         xbmcplugin.endOfDirectory(_handle, succeeded=False)
         return
-    results = search_and_score_tmdbh(params)
     if not results:
         xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
         xbmcplugin.endOfDirectory(_handle)
@@ -781,6 +856,9 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
 
 def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
     results = search_and_score_tmdbh(params)
+    if results is None:
+        xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+        return
     if not results:
         xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
@@ -794,7 +872,8 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
         return
 
     xbmc.log(f"[KodiSimpleStream] Best score {best['score']} below threshold {min_score}, showing source picker", xbmc.LOGINFO)
-    select_tmdbh_source(params)
+    # The picker shows the same sources, no second search
+    select_tmdbh_source(params, results)
 
 
 def tmdbh_play(params: Dict[str, Any]) -> None:
@@ -803,8 +882,9 @@ def tmdbh_play(params: Dict[str, Any]) -> None:
         xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "Missing required metadata for TMDb Helper search", xbmcgui.NOTIFICATION_ERROR, 4000)
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
-    # Without a Webshare login get_api() already told the user – do not report "no sources" or offer a new search
-    if not get_api():
+    # Searching needs no login, but playback does: without credentials ask for them now (30009),
+    # do not search, report "no sources" or offer a new search. The login itself waits for play_ident.
+    if not _credentials():
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
 

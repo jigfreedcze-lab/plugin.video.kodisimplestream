@@ -52,7 +52,7 @@ log.clear(); k.list_episodes("tv:4", "1", "Seriál", ""); assert log == [("notif
 import importlib; importlib.reload(k)  # skutečné get_tmdb
 log.clear(); Addon.settings["tmdb_api_key"] = "  Bearer  "; assert k.get_tmdb() is None and log == [("notif", "ZADEJ KLÍČ")], log
 Addon.settings["tmdb_api_key"] = " 0123456789abcdef0123456789abcdef "; assert k.get_tmdb() is not None
-log.clear(); Addon.settings.update(username="", password=""); assert k.get_api() is None and log == [("notif", "#30009")], log
+log.clear(); Addon.settings.update(username="", password=""); assert k.login_api() == (None, False) and log == [("notif", "#30009")], log
 print("plugin: 11 kontrol prošlo")
 
 # --- volitelné TMDb: menu a průvodce klíčem ---

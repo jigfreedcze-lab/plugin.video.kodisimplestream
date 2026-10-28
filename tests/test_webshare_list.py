@@ -4,6 +4,7 @@ Spuštění z kořene repozitáře: python tests/test_webshare_list.py
 """
 import os
 import sys
+import time
 import types
 import urllib.parse
 
@@ -38,11 +39,19 @@ class ListItem:
     def setArt(self, art): self.art = art
     def setProperty(self, k, v): self.props[k] = v
 
-selects = []
+selects, inputs = [], []
 class Dialog:
     def notification(self, heading, msg, icon=None, ms=None): log.append(("notif", msg))
     def select(self, heading, labels, preselect=-1, *a): log.append(("select", tuple(labels), preselect)); return selects.pop(0)
-sys.modules["xbmcgui"] = types.SimpleNamespace(Dialog=Dialog, ListItem=ListItem, NOTIFICATION_ERROR="err", NOTIFICATION_INFO="info")
+    def input(self, heading, default=""): log.append(("input", default)); return inputs.pop(0)
+
+class Window:
+    props = {}  # okno 10000 přežije volání pluginu (samostatné procesy)
+    def __init__(self, window_id): assert window_id == 10000, window_id
+    def getProperty(self, k): return self.props.get(k, "")
+    def setProperty(self, k, v): self.props[k] = v
+    def clearProperty(self, k): self.props.pop(k, None)
+sys.modules["xbmcgui"] = types.SimpleNamespace(Dialog=Dialog, ListItem=ListItem, Window=Window, NOTIFICATION_ERROR="err", NOTIFICATION_INFO="info")
 
 items = []
 sys.modules["xbmcplugin"] = types.SimpleNamespace(
@@ -55,18 +64,32 @@ sys.modules["xbmcplugin"] = types.SimpleNamespace(
 )
 sys.argv = ["plugin://plugin.video.kodisimplestream/", "1", ""]
 import kodisimplestream as k
+from resources.lib.webshare import WebshareAPI, WebshareError, WebshareStatusError
+real_get_api = k.get_api
 
 class FakeAPI:
-    def __init__(self, pages=None, link="https://dl/x", link_exc=None):
+    def __init__(self, pages=None, link="https://dl/x", link_exc=None, delays=None, search_exc=None):
         self.pages, self.link, self.link_exc, self.calls, self.links = pages or {}, link, link_exc, [], []
+        self.delays, self.search_exc, self.batches, self.logins, self.link_tokens, self.token = delays or {}, search_exc or {}, [], [], [], ""
     def search(self, term, limit=30, offset=0, sort="rating", category="video"):
         self.calls.append((term, limit, offset, sort))
+        time.sleep(self.delays.get(term, 0))
+        if term in self.search_exc:
+            raise self.search_exc[term]
         total, files = self.pages.get((term, offset), (0, None))
         return {"response": {"total": str(total), **({"file": files} if files is not None else {})}}
+    def search_all(self, queries, **kwargs):
+        # skutečné paralelní hledání z webshare.py, jen si zapamatuje dávku dotazů v pořadí
+        self.batches.append(list(queries))
+        return WebshareAPI.search_all(self, queries, **kwargs)
+    def login(self, user, password):
+        self.logins.append(user); self.token = f"tok{len(self.logins)}"
+    def set_token(self, token): self.token = token
     def get_download_link(self, ident):
-        self.links.append(ident)
-        if self.link_exc:
-            raise self.link_exc
+        self.links.append(ident); self.link_tokens.append(self.token)
+        exc = self.link_exc(self.token) if callable(self.link_exc) else self.link_exc
+        if exc:
+            raise exc
         return self.link
 
 def f(ident): return {"ident": ident, "name": f"{ident}.1080p.mkv", "size": "100", "img": ""}
@@ -127,9 +150,12 @@ groups += 1
 for api, expect in ((FakeAPI(link="https://dl/1"), [("resolved", True, "https://dl/1")]),
                     (FakeAPI(link=""), [("notif", "BEZ ODKAZU"), ("resolved", False, "")]),
                     (FakeAPI(link_exc=RuntimeError("síť")), [("notif", "BEZ ODKAZU"), ("resolved", False, "")])):
-    log.clear(); k.get_api = lambda api=api: api; k.router("action=play_ident&ident=ID1")
+    # bez uloženého tokenu (opakování s novým přihlášením zkouší bod 17)
+    Window.props.clear(); log.clear(); k.get_api = lambda api=api: api; k.router("action=play_ident&ident=ID1")
     assert api.links == ["ID1"] and [e for e in log if e[0] != "log"] == expect, log
-log.clear(); k.get_api = lambda: None; k.play_ident("ID1"); assert log == [("resolved", False, "")], log
+Addon.settings["username"] = ""
+log.clear(); k.play_ident("ID1"); assert log == [("notif", "#30009"), ("resolved", False, "")], log
+Addon.settings["username"] = "u"
 log.clear(); k.router("action=play&video=https%3A%2F%2Fold%2Flink"); assert log == [("resolved", True, "https://old/link")], log
 groups += 1
 
@@ -274,22 +300,26 @@ ep_files = [n("e3", "Pernikovy.tata.S01E03.mkv"), n("bb22", "Breaking.Bad.S02E02
 api = FakeAPI({("Perníkový táta S01E02", 0): (3, ep_files)}); k.get_api = lambda: api
 items.clear(); log.clear(); k.router(ep_url.split("?", 1)[1])
 # dotazy z matching.build_search_queries: SxxEyy s oběma názvy, název seriálu s názvem epizody, 1x02
-assert [c[0] for c in api.calls] == ["Perníkový táta S01E02", "Breaking Bad S01E02", "Perníkový táta Cat's in the Bag...",
-                                     "Perníkový táta 1x02"], api.calls
+assert api.batches == [["Perníkový táta S01E02", "Breaking Bad S01E02", "Perníkový táta Cat's in the Bag...",
+                         "Perníkový táta 1x02"]], api.batches
+assert sorted(c[0] for c in api.calls) == sorted(api.batches[0]), api.calls
 assert idents() == ["e2", "e3", "bb22"], idents()
 assert shown_scores() == {x["ident"]: score_episode_result(x, ep) for x in ep_files}, shown_scores()
 groups += 1
 
 print(f"webshare výpis: {groups} skupin kontrol prošlo")
 
-# 14. TMDb Helper bez přihlášení k Webshare: jen hláška z get_api, žádné „nenalezeno“ ani nové hledání
-log.clear(); k.get_api = lambda: None
-called = []
-k.search_and_score_tmdbh = lambda *a, **kw: called.append("search") or []
-k.tmdbh_play({"mediatype": "movie", "title": "Film", "year": "2020"})
-assert called == [] and log == [("resolved", False, "")], log
-log.clear(); k.list_tmdbh_sources({"mediatype": "movie", "title": "Film"})
-assert called == [] and log == [("end", False, False)], log
+# 14. TMDb Helper bez jména a hesla: přehrání se hned zeptá na přihlášení (30009), nehledá a nehlásí „nenalezeno“;
+#     výpis zdrojů hledá anonymně, přihlášení chce až přehrání položky (play_ident)
+Addon.settings.update(username="", password="")
+api = FakeAPI({("Film 2020", 0): (1, [f("F")])}); k.get_api = lambda: api
+log.clear(); k.tmdbh_play({"mediatype": "movie", "title": "Film", "year": "2020"})
+assert api.calls == [] and log == [("notif", "#30009"), ("resolved", False, "")], log
+items.clear(); log.clear(); k.list_tmdbh_sources({"mediatype": "movie", "title": "Film", "year": "2020"})
+assert [params(u)["ident"] for u, _, _ in items] == ["F"] and log[-1] == ("end", True, False) and api.logins == [], log
+assert not [e for e in log if e[0] == "notif"], log
+log.clear(); k.router(items[0][0].split("?", 1)[1]); assert log == [("notif", "#30009"), ("resolved", False, "")], log
+Addon.settings.update(username="u", password="p")
 print("tmdbh bez přihlášení: OK")
 
 # 15. Náhled videa místo odznaku kvality (výchozí), kvalita v popisku; vypnutí v nastavení; soubor bez náhledu
@@ -311,3 +341,119 @@ assert li.art["thumb"] == li.art["landscape"] == "https://img/P-S.jpg" and li.la
 li = k._tmdbh_source_listitem({"ident": "N", "name": "Film.2020.mkv", "img": None, "size": 100, "score": 50})
 assert li.art["thumb"].endswith("sd.png") and not li.label.startswith("["), (li.art, li.label)
 print("náhledy TMDb Helper: OK")
+
+# 17. Token z přihlášení v okně 10000 pro celé sezení Kodi: další přehrání jen file_link; jiný účet a odmítnutý
+#     uložený token → nové přihlášení (jen jednou); síťová chyba ani čerstvý token se znovu nepřihlašují
+def play(api, ident="ID1"):
+    k.get_api = lambda: api; log.clear(); k.play_ident(ident)
+    return [e for e in log if e[0] != "log"]
+Window.props.clear()
+api = FakeAPI(link="https://dl/1")
+assert play(api) == [("resolved", True, "https://dl/1")] and api.logins == ["u"] and api.link_tokens == ["tok1"]
+stored = Window.props[k.TOKEN_PROPERTY]; assert stored.endswith(":tok1") and "u" != stored.split(":")[0], stored
+api = FakeAPI(link="https://dl/2")  # další volání pluginu = nový proces
+assert play(api) == [("resolved", True, "https://dl/2")] and api.logins == [] and api.link_tokens == ["tok1"], api.logins
+Addon.settings["username"] = "jiny"; api = FakeAPI()
+assert play(api)[-1][1] is True and api.logins == ["jiny"] and Window.props[k.TOKEN_PROPERTY] != stored
+Addon.settings["username"] = "u"; Window.props[k.TOKEN_PROPERTY] = stored.replace("tok1", "old")
+expired = lambda token: WebshareStatusError("Webshare file_link/ returned FATAL") if token == "old" else None
+api = FakeAPI(link="https://dl/3", link_exc=expired)
+assert play(api) == [("resolved", True, "https://dl/3")] and api.logins == ["u"] and api.link_tokens == ["old", "tok1"], api.link_tokens
+assert Window.props[k.TOKEN_PROPERTY].endswith(":tok1")
+api = FakeAPI(link_exc=lambda token: WebshareStatusError("missing"))  # čerstvý token: soubor opravdu chybí
+assert play(api) == [("notif", "BEZ ODKAZU"), ("resolved", False, "")] and api.link_tokens == ["tok1", "tok1"] and api.logins == ["u"]
+# hláška Webshare se ukáže tak, jak ji poslal (soubor dočasně nedostupný)
+unavailable = WebshareStatusError("Webshare file_link/ returned FATAL: File temporarily unavailable. (FILE_LINK_FATAL_4)",
+                                  "File temporarily unavailable.", "FILE_LINK_FATAL_4")
+api = FakeAPI(link_exc=lambda token: unavailable)
+assert play(api) == [("notif", "Webshare: File temporarily unavailable."), ("resolved", False, "")], log
+Window.props[k.TOKEN_PROPERTY] = stored
+api = FakeAPI(link_exc=WebshareError("Webshare did not respond in time"))
+assert play(api) == [("notif", "Webshare did not respond in time"), ("resolved", False, "")] and api.logins == [] and len(api.links) == 1
+# Odvolaný uložený token může dostat status OK bez odkazu → také nové přihlášení, jen jednou
+class EmptyLink(FakeAPI):
+    def get_download_link(self, ident): return FakeAPI.get_download_link(self, ident) if self.token != "old" else (self.link_tokens.append(self.token) or "")
+Window.props[k.TOKEN_PROPERTY] = stored.replace("tok1", "old"); api = EmptyLink(link="https://dl/5")
+assert play(api) == [("resolved", True, "https://dl/5")] and api.logins == ["u"] and api.link_tokens == ["old", "tok1"], api.link_tokens
+api = FakeAPI(link="")  # ani po novém přihlášení bez odkazu: konec, žádné další přihlášení
+Window.props[k.TOKEN_PROPERTY] = stored.replace("tok1", "old")
+assert play(api) == [("notif", "BEZ ODKAZU"), ("resolved", False, "")] and api.logins == ["u"] and api.link_tokens == ["old", "tok1"], api.link_tokens
+Window.props[k.TOKEN_PROPERTY] = stored
+# Uložený token se používá jen omezenou dobu (file_link možná odvolaný token neodmítne); starý formát bez času
+account, saved, _ = stored.split(":", 2)
+for value in (f"{account}:{int(saved) - k.TOKEN_MAX_AGE - 1}:tok0", f"{account}:{int(saved) + 3600}:tok0", f"{account}:tok0"):
+    Window.props[k.TOKEN_PROPERTY] = value; api = FakeAPI(link="https://dl/4")
+    assert play(api) == [("resolved", True, "https://dl/4")] and api.logins == ["u"] and api.link_tokens == ["tok1"], (value, api.link_tokens)
+Window.props[k.TOKEN_PROPERTY] = f"{account}:{int(saved) - k.TOKEN_MAX_AGE + 60}:tok0"; api = FakeAPI()
+assert play(api)[-1][1] is True and api.logins == [] and api.link_tokens == ["tok0"], api.link_tokens
+class BadLogin(FakeAPI):
+    def login(self, user, password): raise WebshareStatusError("Webshare login/ returned FATAL: Bad password (LOGIN_FATAL_1)")
+Window.props[k.TOKEN_PROPERTY] = stored.replace("tok1", "old")
+api = BadLogin(link_exc=expired)
+assert play(api) == [("notif", "#30006"), ("resolved", False, "")] and k.TOKEN_PROPERTY not in Window.props, log
+assert not any("tok" in str(e) or "old" in str(e) for e in log), "token se nesmí logovat"
+print("token v okně: OK")
+
+# 18. Výpis Webshare bez jména a hesla funguje (hledání nepotřebuje přihlášení)
+Addon.settings.update(username="", password="")
+api = FakeAPI({("a", 0): (1, [f("X")])}); run(api, ["a"])
+assert actions() == ["choose_sort", "play_ident"] and api.logins == [] and log[-1] == ("end", True, False), log
+Addon.settings.update(username="u", password="p")
+print("výpis bez přihlášení: OK")
+
+# 19. Paralelní dotazy: pomalejší první dotaz nemění pořadí stránek pro rank_files ani výsledek;
+#     chyba dotazu (timeout) → upozornění a neúspěšný listing, ne traceback
+api = FakeAPI({(cz_q, 0): (5, fb_files[:5]), (en_q, 0): (3, fb_files[5:])}, delays={cz_q: 0.2})
+run(api, [cz_q, en_q], match=fb); assert idents() == order, idents()
+run(api, [cz_q, en_q]); assert idents() == webshare_order, idents()
+api = FakeAPI({("a", 0): (1, [f("X")])}, search_exc={"b": WebshareError("Webshare did not respond in time")})
+run(api, ["a", "b"])
+assert ("notif", "Chyba vyhledávání: Webshare did not respond in time") in log and log[-1] == ("end", False, False), log
+assert not [i for i in items if params(i[0])["action"] == "play_ident"], items
+print("paralelní hledání: OK")
+
+# 20. TMDb Helper: pod prahem automatického přehrání ukáže výběr ze stejných výsledků, bez druhého hledání;
+#     zrušená změna dotazu ukáže stejný seznam znovu, nový dotaz hledá jen ten
+src = lambda ident, name: {"ident": ident, "name": name, "size": "100", "img": ""}  # n je od 15. přepsané
+tm = {"mediatype": "movie", "title": "Film", "originaltitle": "Film", "year": "2020"}
+api = FakeAPI({("Film 2020", 0): (2, [src("A", "Film.2020.1080p.mkv"), src("B", "Jiny.2019.mkv")]),
+               ("Jiný film", 0): (1, [src("C", "Jiny.film.mkv")])})
+k.get_api = lambda: api; Addon.settings.update(tmdbh_auto_play_best="true", tmdbh_auto_play_min_score="1000")
+log.clear(); selects[:] = [2]; k.tmdbh_play(tm)
+assert len(api.batches) == 1 and [e[0] for e in log if e[0] != "log"] == ["select", "resolved"], (api.batches, log)
+assert log[-1] == ("resolved", True, "https://dl/x") and api.links == ["B"], api.links
+log.clear(); api.batches.clear(); selects[:] = [0, 0, 1]; inputs[:] = ["", "Jiný film"]
+k.tmdbh_play(tm)
+picks = [e for e in log if e[0] == "select"]
+assert api.batches == [k.build_tmdbh_queries(tm), ["Jiný film"]] and len(picks) == 3, api.batches
+labels = [[i.label for i in pick[1]] for pick in picks]
+assert labels[0] == labels[1] and len(labels[0]) == 3 and len(labels[2]) == 2, labels
+assert log[-1] == ("resolved", True, "https://dl/x") and api.links[-1] == "C", api.links
+Addon.settings.update(tmdbh_auto_play_best="", tmdbh_auto_play_min_score="")
+print("tmdbh bez druhého hledání: OK")
+
+# 21. TMDb Helper: Webshare neodpovídá na žádný dotaz → chyba hledání, ne „nenalezeno“ ani nabídka nového dotazu;
+#     odpověď aspoň na jeden dotaz stačí
+down = {q: WebshareError("Webshare did not respond in time") for q in k.build_tmdbh_queries(tm)}
+api = FakeAPI(search_exc=down); k.get_api = lambda: api
+for auto in ("true", ""):
+    Addon.settings["tmdbh_auto_play_best"] = auto
+    log.clear(); k.tmdbh_play(tm)
+    assert [e for e in log if e[0] != "log"] == [("notif", "Chyba vyhledávání: Webshare did not respond in time"), ("resolved", False, "")], log
+items.clear(); log.clear(); k.list_tmdbh_sources(tm)
+assert [e for e in log if e[0] != "log"] == [("notif", "Chyba vyhledávání: Webshare did not respond in time"), ("end", False, False)], log
+ep = {"mediatype": "episode", "showname": "Seriál", "show_originaltitle": "Show", "season": "1", "episode": "2"}
+queries = k.build_tmdbh_queries(ep); assert len(queries) > 1, queries
+api = FakeAPI({(queries[-1], 0): (1, [src("E", "Show.S01E02.mkv")])}, search_exc={queries[0]: WebshareError("x")})
+k.get_api = lambda: api; log.clear(); res = k.search_and_score_tmdbh(ep)
+assert [r["ident"] for r in res] == ["E"] and not [e for e in log if e[0] == "notif"], log
+Addon.settings["tmdbh_auto_play_best"] = ""
+print("tmdbh bez odpovědi: OK")
+
+# 22. Verze OpenSSL jednou do logu (debug), klient sdílený celým voláním pluginu
+k.get_api = real_get_api; k._api = None; orig_api = k.WebshareAPI; k.WebshareAPI = FakeAPI
+log.clear(); first = k.get_api(); assert k.get_api() is first
+import ssl
+assert [e for e in log if e[0] == "log"] == [("log", f"[KodiSimpleStream] {ssl.OPENSSL_VERSION}")], log
+k.WebshareAPI = orig_api
+print("OpenSSL v logu: OK")
