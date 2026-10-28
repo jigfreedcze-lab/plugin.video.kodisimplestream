@@ -388,6 +388,8 @@ assert params(found["Z"][0][1][len("RunPlugin("):-1]).get("count", "") == ""
 plots = {params(u)["ident"]: i.info["plot"] for u, i, _ in items if params(u).get("action") == "play_ident"}
 assert plots["S"].split("[CR]") == ["Film.2020.S.1080p.mkv", "FHD 1080p · 0.0 MB", "Kontextová nabídka: Náhled videa"], plots["S"]
 assert "Náhled videa" not in plots["N"] and plots["N"].startswith("Film.2020.N.1080p.mkv[CR]"), plots["N"]
+# the sort row also has a plot (Icon wall shows "No information available" without one)
+assert [i.info.get("plot") for u, i, _ in items if params(u).get("action") == "choose_sort"] == ["#30071"], items
 results = k.search_and_score_tmdbh({"mediatype": "movie", "title": "Film", "year": "2020"})
 assert {r["ident"]: (r["stripe"], r["stripe_count"]) for r in results}["S"] == ("https://img.webshare.cz/S.jpg", "10"), results
 items.clear(); k.list_tmdbh_sources({"mediatype": "movie", "title": "Film", "year": "2020"})

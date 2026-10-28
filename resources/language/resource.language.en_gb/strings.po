@@ -247,3 +247,11 @@ msgstr "Context menu: Video preview"
 msgctxt "#30070"
 msgid "Not analysed by Webshare yet"
 msgstr "Not analysed by Webshare yet"
+
+msgctxt "#30071"
+msgid "Changes the order of the search results"
+msgstr "Changes the order of the search results"
+
+msgctxt "#30072"
+msgid "Shows the next {} results"
+msgstr "Shows the next {} results"

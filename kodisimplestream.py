@@ -451,6 +451,7 @@ def list_search_results(
         # Sort switch on top – applies only to this search, the default is in settings
         item = xbmcgui.ListItem(label=_addon.getLocalizedString(30037).format(_addon.getLocalizedString(SORT_LABELS[sort])))
         item.setArt({"icon": "DefaultAddonsSearch.png", "thumb": "DefaultAddonsSearch.png"})
+        item.setInfo("video", {"plot": _addon.getLocalizedString(30071)})  # "Changes the order of the search results"
         item.setProperty("SpecialSort", "top")
         url = get_url(action="choose_sort", query=str(search_terms), sort=sort, **_match_params(match))
         xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=False)
@@ -491,6 +492,7 @@ def list_search_results(
         if has_more:
             item = xbmcgui.ListItem(label=_addon.getLocalizedString(30038).format(next_offset // PAGE_SIZE + 1))
             item.setArt({"icon": "DefaultFolder.png", "thumb": "DefaultFolder.png"})
+            item.setInfo("video", {"plot": _addon.getLocalizedString(30072).format(PAGE_SIZE)})  # "Shows the next 30 results"
             item.setProperty("SpecialSort", "bottom")
             url = get_url(action="list_search_results", query=str(search_terms), sort=sort, offset=next_offset, **_match_params(match))
             xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=True)
