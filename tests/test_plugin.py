@@ -20,8 +20,8 @@ sys.argv = ["plugin://plugin.video.kodisimplestream/", "1", ""]
 import kodisimplestream as k
 from resources.lib.tmdb import TMDBAuthError
 
-searched = []
-k.list_search_results = lambda q: searched.append(q)
+searched, matches = [], []
+k.list_search_results = lambda q, match=None: (searched.append(q), matches.append(match))
 class FakeTMDB:
     def __init__(self, detail=None, exc=None): self.detail, self.exc = detail, exc
     def get_detail(self, i):
@@ -32,8 +32,16 @@ class FakeTMDB:
 
 k.get_tmdb = lambda: FakeTMDB({"title": "Neznámý film", "year": None, "original_title": None})
 k.handle_tmdb_selection("movie:1", "movie"); assert searched[-1] == ["Neznámý film"], searched
+assert matches[-1] == {"mediatype": "movie", "title": "Neznámý film", "originaltitle": "", "year": ""}, matches
 k.get_tmdb = lambda: FakeTMDB({"title": "Pelíšky", "year": "1999", "original_title": None})
 k.handle_tmdb_selection("movie:2", "movie"); assert searched[-1] == ["Pelíšky 1999"], searched
+# TMDb názvy pro skóre shody: výsledky anglického dotazu nesmí zůstat za šumem českého
+k.get_tmdb = lambda: FakeTMDB({"title": "Fantastická zvířata: Brumbálova tajemství", "year": "2022",
+                               "original_title": "Fantastic Beasts: The Secrets of Dumbledore"})
+k.handle_tmdb_selection("movie:338953", "movie")
+assert searched[-1] == ["Fantastická zvířata: Brumbálova tajemství 2022", "Fantastic Beasts: The Secrets of Dumbledore"], searched
+assert matches[-1] == {"mediatype": "movie", "title": "Fantastická zvířata: Brumbálova tajemství",
+                       "originaltitle": "Fantastic Beasts: The Secrets of Dumbledore", "year": "2022"}, matches
 log.clear(); k.get_tmdb = lambda: FakeTMDB(exc=TMDBAuthError("x"))
 k.handle_tmdb_selection("movie:3", "movie"); assert log == [("notif", "KLÍČ ODMÍTNUT"), ("end", False)], log
 log.clear(); k.get_tmdb = lambda: FakeTMDB({"title": "Seriál", "year": "2008", "original_title": None})
@@ -44,7 +52,7 @@ import importlib; importlib.reload(k)  # skutečné get_tmdb
 log.clear(); Addon.settings["tmdb_api_key"] = "  Bearer  "; assert k.get_tmdb() is None and log == [("notif", "ZADEJ KLÍČ")], log
 Addon.settings["tmdb_api_key"] = " 0123456789abcdef0123456789abcdef "; assert k.get_tmdb() is not None
 log.clear(); Addon.settings.update(username="", password=""); assert k.get_api() is None and log == [("notif", "#30009")], log
-print("plugin: 8 kontrol prošlo")
+print("plugin: 11 kontrol prošlo")
 
 # --- volitelné TMDb: menu a průvodce klíčem ---
 answers = []

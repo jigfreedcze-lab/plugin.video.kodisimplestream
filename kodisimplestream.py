@@ -8,6 +8,7 @@ from __future__ import annotations  # Enables forward references in older Python
 
 # Kodi plugin boilerplate and plugin-specific modules
 import ast
+import json
 import os
 import sys
 from typing import Any, Dict, List, Optional
@@ -75,7 +76,7 @@ def _resolution_badge_art(source: Dict[str, Any], fallback_image: str = "") -> D
 
 # Index of the "lang_pref" setting → preference understood by matches_language_preference()
 LANG_PREFS = ["", "cz_audio", "cz_subs"]
-# Bonus to the TMDb Helper match score when sorting, the shown score stays unchanged
+# Bonus to the match score (TMDb Helper, TMDb search) when sorting, the shown score stays unchanged
 LANG_PREF_BONUS = 15
 
 def language_preference() -> str:
@@ -230,15 +231,22 @@ def _as_list(value: Any) -> List[Any]:
         return []
     return value if isinstance(value, list) else [value]
 
+def _match_params(match: Optional[Dict[str, Any]]) -> Dict[str, str]:
+    """URL parameter with the TMDb metadata for match scoring (JSON, urlencode encodes its commas)."""
+    return {"match": json.dumps(match, ensure_ascii=False, separators=(",", ":"))} if match else {}
+
 def list_search_results(
     search_terms: List[str],
     sort: Optional[int] = None,
     offset: int = 0,
     replace: bool = False,
+    match: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Displays one page of search results for a list of search terms using WebshareAPI.
     The same file found by more terms is shown once, the download link is resolved on playback.
+    match: TMDb metadata (see matching.py) – in the best match order the results are sorted
+    by the match score like in the TMDb Helper flow.
     """
     api = get_api()
     if not api:
@@ -288,12 +296,23 @@ def list_search_results(
         item = xbmcgui.ListItem(label=_addon.getLocalizedString(30037).format(_addon.getLocalizedString(SORT_LABELS[sort])))
         item.setArt({"icon": "DefaultAddonsSearch.png", "thumb": "DefaultAddonsSearch.png"})
         item.setProperty("SpecialSort", "top")
-        url = get_url(action="choose_sort", query=str(search_terms), sort=sort)
+        url = get_url(action="choose_sort", query=str(search_terms), sort=sort, **_match_params(match))
         xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=False)
 
         sources = [(file_info, normalize_source(file_info)) for file_info in rows]
         preference = language_preference()
-        if preference:
+        if match and sort == 0:
+            # Webshare ORs the query words: noise sharing one word with the first query comes before
+            # the right files found by the next one. Score against the TMDb titles like TMDb Helper does.
+            episode = (match.get("mediatype") or "").lower() == "episode"
+            for file_info, source in sources:
+                source["score"] = score_episode_result(file_info, match) if episode else score_movie_result(file_info, match)
+            # Stable sort keeps the Webshare order for equal scores, the language bonus is not shown
+            sources.sort(
+                key=lambda pair: pair[1]["score"] + (LANG_PREF_BONUS if matches_language_preference(pair[1], preference) else 0),
+                reverse=True,
+            )
+        elif preference:
             # Preferred dub/subtitles first, otherwise keep the Webshare order (stable sort)
             sources.sort(key=lambda pair: not matches_language_preference(pair[1], preference))
 
@@ -320,7 +339,7 @@ def list_search_results(
             item = xbmcgui.ListItem(label=_addon.getLocalizedString(30038).format(next_offset // PAGE_SIZE + 1))
             item.setArt({"icon": "DefaultFolder.png", "thumb": "DefaultFolder.png"})
             item.setProperty("SpecialSort", "bottom")
-            url = get_url(action="list_search_results", query=str(search_terms), sort=sort, offset=next_offset)
+            url = get_url(action="list_search_results", query=str(search_terms), sort=sort, offset=next_offset, **_match_params(match))
             xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=True)
 
         # Kodi sorting (side menu) only reorders the loaded page
@@ -338,12 +357,12 @@ def list_search_results(
             5000,
         )
 
-def choose_sort(search_terms: List[str], current: int) -> None:
+def choose_sort(search_terms: List[str], current: int, match: Optional[Dict[str, Any]] = None) -> None:
     """Lets the user pick a different order for the current search and reloads the list."""
     labels = [_addon.getLocalizedString(label_id) for label_id in SORT_LABELS]
     selected = xbmcgui.Dialog().select(_addon.getLocalizedString(30039), labels, preselect=current)
     if 0 <= selected != current:
-        url = get_url(action="list_search_results", query=str(search_terms), sort=selected, replace=1)
+        url = get_url(action="list_search_results", query=str(search_terms), sort=selected, replace=1, **_match_params(match))
         xbmc.executebuiltin(f"Container.Update({url})")
     # Opened as a folder or by the Play button – close it and stay in the list
     if _handle >= 0:
@@ -420,7 +439,14 @@ def handle_tmdb_selection(tmdb_id: str, search_type: str) -> None:
         queries: List[str] = [f"{details['title']} {year}" if year else details["title"]]
         if details.get("original_title") and details["original_title"] != details["title"]:
             queries.append(details["original_title"])
-        list_search_results(queries)
+        # TMDb titles for the match score – files found by the original title should not end up below noise
+        match = {
+            "mediatype": "movie",
+            "title": details["title"],
+            "originaltitle": details.get("original_title") or "",
+            "year": year or "",
+        }
+        list_search_results(queries, match=match)
         return
 
     # Series → show list of seasons
@@ -480,7 +506,15 @@ def list_episodes(
         if original_title and original_title != series_title:
             queries.append(f"{original_title} S{season_no:02d}E{ep_no:02d}")
 
-        url = get_url(action="list_search_results", query=str(queries))
+        match = {
+            "mediatype": "episode",
+            "showname": series_title,
+            "show_originaltitle": original_title or "",
+            "season": season_no,
+            "episode": ep_no,
+            "episode_title": ep.get("title") or "",
+        }
+        url = get_url(action="list_search_results", query=str(queries), **_match_params(match))
         xbmcplugin.addDirectoryItem(_handle, url, xbmcgui.ListItem(label=label), isFolder=True)
 
     xbmcplugin.endOfDirectory(_handle)
@@ -793,6 +827,19 @@ def _parse_query(raw_query: str) -> List[str]:
         query_list = [raw_query]
     return [str(q) for q in query_list]
 
+def _parse_match(raw_match: Optional[str]) -> Optional[Dict[str, Any]]:
+    """TMDb metadata for match scoring is a JSON object in the URL, anything else is ignored."""
+    if not raw_match:
+        return None
+    try:
+        match = json.loads(raw_match)
+    except ValueError:
+        return None
+    if not isinstance(match, dict):
+        return None
+    # matching.py expects text values, an edited URL must not break the listing
+    return {str(key): "" if value is None else str(value) for key, value in match.items()}
+
 def _int_param(params: Dict[str, str], name: str) -> Optional[int]:
     """Returns an integer URL parameter, None when missing or invalid."""
     try:
@@ -840,9 +887,10 @@ def router(paramstring: str) -> None:
             _int_param(params, "sort"),
             _int_param(params, "offset") or 0,
             params.get("replace") == "1",
+            match=_parse_match(params.get("match")),
         )
     elif action == "choose_sort":
-        choose_sort(_parse_query(params["query"]), _int_param(params, "sort") or 0)
+        choose_sort(_parse_query(params["query"]), _int_param(params, "sort") or 0, match=_parse_match(params.get("match")))
     else:
         raise ValueError(f"Invalid paramstring: {paramstring}!")
 

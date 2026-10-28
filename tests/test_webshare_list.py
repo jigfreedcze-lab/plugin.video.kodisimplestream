@@ -149,11 +149,22 @@ groups += 1
 # 8. routování výsledků s parametry
 seen = []
 orig = k.list_search_results
-k.list_search_results = lambda q, s=None, o=0, r=False: seen.append((q, s, o, r))
+k.list_search_results = lambda q, s=None, o=0, r=False, match=None: seen.append((q, s, o, r, match))
 k.router("action=list_search_results&query=%5B%27a%27%5D&sort=4&offset=60&replace=1")
 k.router("action=list_search_results&query=jen+text&offset=abc")
-assert seen == [(["a"], 4, 60, True), (["jen text"], None, 0, False)], seen
+assert seen == [(["a"], 4, 60, True, None), (["jen text"], None, 0, False, None)], seen
+# match: objekt JSON, hodnoty jako text (matching.py), neplatný JSON / jiný typ → bez skóre
+seen.clear()
+for raw in ('{"mediatype":"movie","title":"Dune","year":2021,"originaltitle":null}', "{vadný", "[1, 2]", "null", '"text"', ""):
+    k.router("action=list_search_results&query=%5B%27a%27%5D&" + urllib.parse.urlencode({"match": raw}))
+assert [m for *_, m in seen] == [{"mediatype": "movie", "title": "Dune", "year": "2021", "originaltitle": ""}] + [None] * 5, seen
 k.list_search_results = orig
+seen.clear(); orig_sort = k.choose_sort
+k.choose_sort = lambda q, current, match=None: seen.append((q, current, match))
+k.router("action=choose_sort&query=%5B%27a%27%5D&sort=2&match=%7B%22title%22%3A%22Dune%22%7D")
+k.router("action=choose_sort&query=%5B%27a%27%5D&sort=2&match=%7B")
+assert seen == [(["a"], 2, {"title": "Dune"}), (["a"], 2, None)], seen
+k.choose_sort = orig_sort
 groups += 1
 
 # 9. TMDb Helper hledá vždy podle shody s názvem (OR hledání u jiného řazení přináší šum)
@@ -179,6 +190,91 @@ Addon.settings["lang_pref"] = "1"; res = k.search_and_score_tmdbh(tm)
 assert [r["ident"] for r in res][0] == "D" and {r["ident"]: r["score"] for r in res} == base, (res, base)
 Addon.settings["lang_pref"] = "7"; assert k.language_preference() == ""
 Addon.settings["lang_pref"] = "0"
+groups += 1
+
+# 11. TMDb hledání filmu: s TMDb názvy (match) a řazením podle shody řadit podle skóre z matching.py jako
+#     u TMDb Helperu. Webshare hledá slova přes OR – za šumem českého dotazu by zůstaly správné soubory
+#     nalezené anglickým názvem (ve skutečnosti až od 31. místa).
+import json
+from resources.lib.matching import score_episode_result, score_movie_result
+cz_q, en_q = "Fantastická zvířata: Brumbálova tajemství 2022", "Fantastic Beasts: The Secrets of Dumbledore"
+fb = {"mediatype": "movie", "title": "Fantastická zvířata: Brumbálova tajemství",
+      "originaltitle": "Fantastic Beasts: The Secrets of Dumbledore", "year": "2022"}
+fb_files = [n("cz4k", "Fantasticka zvirata   Brumbalova tajemstvi 2022 CZ Dabing 2160p -vorek"),
+            n("cz1080", "Fantastická zvířata Brumbálova tajemství CZ Dabing 1080p 2022.mkv"),
+            n("zoo", "ZOO 52 Odhalene tajemstvi (2022) 720p.mkv"),
+            n("hlubin", "Zvířata z hlubin 2022 S01E01 Tini Heke (H264-CZ).mp4"),
+            n("grind_cz", "Fantastická zvířata-Grindelwaldovy zločiny-fantasy film USA_VB 2018 cz.avi"),
+            n("en", "Fantastic Beasts The Secrets of Dumbledore 2022 1080p MAX WEB-DL DDP5.1.mkv"),
+            n("grind_en", "Fantastic.Beasts.The.Crimes.Of.Grindelwald.2018.1080p.BluRay.x264.mkv"),
+            n("blanche", "The Secret of Madame Blanche (Charles Brabin, 1933).avi")]
+webshare_order = [x["ident"] for x in fb_files]
+right, noise, other_parts = {"cz4k", "cz1080", "en"}, {"zoo", "hlubin"}, {"grind_cz", "grind_en"}
+api = FakeAPI({(cz_q, 0): (5, fb_files[:5]), (en_q, 0): (3, fb_files[5:])})
+def idents(): return [params(u)["ident"] for u, _, _ in items if params(u)["action"] == "play_ident"]
+def shown_scores():
+    rows = [(params(u)["ident"], i.label2) for u, i, _ in items if params(u)["action"] == "play_ident"]
+    return {ident: int(line.rsplit("score ", 1)[1]) if "score " in line else None for ident, line in rows}
+expected = {x["ident"]: score_movie_result(x, fb) for x in fb_files}
+run(api, [cz_q, en_q], match=fb); order = idents()
+assert set(order[:3]) == right and set(order[3:5]) == noise and other_parts <= set(order[5:]), order
+assert order == ["cz4k", "cz1080", "en", "zoo", "hlubin", "grind_en", "grind_cz", "blanche"], order  # 92 90 40 17 15 -15 -20 -20
+assert shown_scores() == expected, shown_scores()  # skóre ve druhém řádku
+assert [c[3] for c in api.calls] == ["", ""] and log[-1] == ("end", True, False)
+# bez match nebo s jiným řazením pořadí Webshare a žádné skóre
+for kwargs in ({}, {"sort": 1, "match": fb}, {"sort": 4, "match": fb}):
+    run(api, [cz_q, en_q], **kwargs)
+    assert idents() == webshare_order and set(shown_scores().values()) == {None}, (kwargs, idents())
+Addon.settings["ws_sort"] = "1"; run(api, [cz_q, en_q], match=fb); assert idents() == webshare_order, idents()
+Addon.settings["ws_sort"] = "0"; run(api, [cz_q, en_q], match=fb); assert idents() == order, idents()
+Addon.settings["ws_sort"] = ""
+# CZ dabing: +15 jen k řazení – „Zvířata z hlubin … CZ“ (15) předběhne ZOO (17), zobrazené skóre se nemění
+Addon.settings["lang_pref"] = "1"; run(api, [cz_q, en_q], match=fb); pref_order = idents()
+assert pref_order == ["cz4k", "cz1080", "en", "hlubin", "zoo", "grind_cz", "grind_en", "blanche"], pref_order
+assert shown_scores() == expected, shown_scores()
+Addon.settings["lang_pref"] = "0"
+groups += 1
+
+# 12. match zůstává v URL „Další“ i „Řazení“, volba řazení ho předá dál přes Container.Update
+api = FakeAPI({("a", 0): (54, page("p", 30)), ("a", 30): (54, [n("m", "Fantastic.Beasts.The.Secrets.of.Dumbledore.2022.mkv")])})
+run(api, ["a"], match=fb); sort_url, next_url = items[0][0], items[-1][0]
+assert params(sort_url)["action"] == "choose_sort" and json.loads(params(sort_url)["match"]) == fb, sort_url
+assert params(next_url)["action"] == "list_search_results" and json.loads(params(next_url)["match"]) == fb, next_url
+items.clear(); log.clear(); k.router(next_url.split("?", 1)[1])
+assert api.calls[-1][2] == 30 and shown_scores() == {"m": score_movie_result({"name": "Fantastic.Beasts.The.Secrets.of.Dumbledore.2022.mkv"}, fb)}
+k._handle = -1
+for current, chosen in ((0, 1), (1, 0)):
+    log.clear(); selects[:] = [chosen]
+    k.router(f"action=choose_sort&query=%5B%27a%27%5D&sort={current}&" + urllib.parse.urlencode(k._match_params(fb)))
+    cmd = log[-1][1]; inner = cmd[len("Container.Update("):-1]
+    assert cmd.startswith("Container.Update(plugin://") and "," not in inner, cmd
+    assert params(inner)["sort"] == str(chosen) and json.loads(params(inner)["match"]) == fb, params(inner)
+k._handle = 1
+# bez match se parametr do URL nepřidává
+run(api, ["a"]); assert "match" not in params(items[0][0]) and "match" not in params(items[-1][0])
+# neplatný match v URL: výpis bez skóre v pořadí Webshare, nespadne
+api = FakeAPI({("a", 0): (2, [f("X"), f("Y")])}); k.get_api = lambda: api
+for raw in ("{vadný", "[1]", '{"title": 5, "year": null, "season": [1]}'):
+    items.clear(); log.clear(); k.router("action=list_search_results&query=%5B%27a%27%5D&sort=0&" + urllib.parse.urlencode({"match": raw}))
+    assert idents() == ["X", "Y"] and log[-1] == ("end", True, False), (raw, log)
+groups += 1
+
+# 13. epizoda: list_episodes vloží match do URL, router ho předá a skóruje se přes score_episode_result
+class FakeTMDB:
+    def get_episodes(self, tmdb_id, season_id):
+        return [{"id": "62086", "title": "Cat's in the Bag...", "season": 1, "number": 2}]
+k.get_tmdb = lambda: FakeTMDB()
+items.clear(); log.clear(); k.list_episodes("tv:1396", "1", "Perníkový táta", "Breaking Bad")
+ep_url = items[0][0]; ep = json.loads(params(ep_url)["match"])
+assert ep == {"mediatype": "episode", "showname": "Perníkový táta", "show_originaltitle": "Breaking Bad",
+              "season": 1, "episode": 2, "episode_title": "Cat's in the Bag..."}, ep
+assert "," not in ep_url and items[0][2] is True and log[-1] == ("end", True, False)
+ep_files = [n("e3", "Pernikovy.tata.S01E03.mkv"), n("bb22", "Breaking.Bad.S02E02.mkv"), n("e2", "Pernikovy.tata.S01E02.CZ.mkv")]
+api = FakeAPI({("Perníkový táta S01E02", 0): (3, ep_files)}); k.get_api = lambda: api
+items.clear(); log.clear(); k.router(ep_url.split("?", 1)[1])
+assert [c[0] for c in api.calls] == ["Perníkový táta S01E02", "Breaking Bad S01E02"], api.calls
+assert idents() == ["e2", "e3", "bb22"], idents()
+assert shown_scores() == {x["ident"]: score_episode_result(x, ep) for x in ep_files}, shown_scores()
 groups += 1
 
 print(f"webshare výpis: {groups} skupin kontrol prošlo")
