@@ -217,8 +217,9 @@ def shown_scores():
     return {ident: int(line.rsplit("score ", 1)[1]) if "score " in line else None for ident, line in rows}
 expected = {x["ident"]: score_movie_result(x, fb) for x in fb_files}
 run(api, [cz_q, en_q], match=fb); order = idents()
-assert set(order[:3]) == right and set(order[3:5]) == noise and other_parts <= set(order[5:]), order
-assert order == ["cz4k", "cz1080", "en", "zoo", "hlubin", "grind_en", "grind_cz", "blanche"], order  # 92 90 40 17 15 -15 -20 -20
+# jiné díly série (shoda názvu před dvojtečkou, jiný rok) před šumem s jedním společným slovem
+assert set(order[:3]) == right and set(order[3:5]) == other_parts and noise <= set(order[5:]), order
+assert order == ["cz4k", "cz1080", "en", "grind_en", "grind_cz", "zoo", "hlubin", "blanche"], order  # 97 95 95 20 14 6 -17 -18
 assert shown_scores() == expected, shown_scores()  # skóre ve druhém řádku
 assert [c[3] for c in api.calls] == ["", ""] and log[-1] == ("end", True, False)
 # bez match nebo s jiným řazením pořadí Webshare a žádné skóre
@@ -228,9 +229,9 @@ for kwargs in ({}, {"sort": 1, "match": fb}, {"sort": 4, "match": fb}):
 Addon.settings["ws_sort"] = "1"; run(api, [cz_q, en_q], match=fb); assert idents() == webshare_order, idents()
 Addon.settings["ws_sort"] = "0"; run(api, [cz_q, en_q], match=fb); assert idents() == order, idents()
 Addon.settings["ws_sort"] = ""
-# CZ dabing: +15 jen k řazení – „Zvířata z hlubin … CZ“ (15) předběhne ZOO (17), zobrazené skóre se nemění
+# CZ dabing: +15 jen k řazení – český Grindelwald … cz (14) předběhne anglický (20), zobrazené skóre se nemění
 Addon.settings["lang_pref"] = "1"; run(api, [cz_q, en_q], match=fb); pref_order = idents()
-assert pref_order == ["cz4k", "cz1080", "en", "hlubin", "zoo", "grind_cz", "grind_en", "blanche"], pref_order
+assert pref_order == ["cz4k", "cz1080", "en", "grind_cz", "grind_en", "zoo", "hlubin", "blanche"], pref_order
 assert shown_scores() == expected, shown_scores()
 Addon.settings["lang_pref"] = "0"
 groups += 1
@@ -272,9 +273,12 @@ assert "," not in ep_url and items[0][2] is True and log[-1] == ("end", True, Fa
 ep_files = [n("e3", "Pernikovy.tata.S01E03.mkv"), n("bb22", "Breaking.Bad.S02E02.mkv"), n("e2", "Pernikovy.tata.S01E02.CZ.mkv")]
 api = FakeAPI({("Perníkový táta S01E02", 0): (3, ep_files)}); k.get_api = lambda: api
 items.clear(); log.clear(); k.router(ep_url.split("?", 1)[1])
-assert [c[0] for c in api.calls] == ["Perníkový táta S01E02", "Breaking Bad S01E02"], api.calls
+# dotazy z matching.build_search_queries: SxxEyy s oběma názvy, název seriálu s názvem epizody, 1x02
+assert [c[0] for c in api.calls] == ["Perníkový táta S01E02", "Breaking Bad S01E02", "Perníkový táta Cat's in the Bag...",
+                                     "Perníkový táta 1x02"], api.calls
 assert idents() == ["e2", "e3", "bb22"], idents()
 assert shown_scores() == {x["ident"]: score_episode_result(x, ep) for x in ep_files}, shown_scores()
 groups += 1
 
 print(f"webshare výpis: {groups} skupin kontrol prošlo")
+

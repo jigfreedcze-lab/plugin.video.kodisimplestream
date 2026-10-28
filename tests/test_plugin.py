@@ -39,7 +39,8 @@ k.handle_tmdb_selection("movie:2", "movie"); assert searched[-1] == ["Pelíšky 
 k.get_tmdb = lambda: FakeTMDB({"title": "Fantastická zvířata: Brumbálova tajemství", "year": "2022",
                                "original_title": "Fantastic Beasts: The Secrets of Dumbledore"})
 k.handle_tmdb_selection("movie:338953", "movie")
-assert searched[-1] == ["Fantastická zvířata: Brumbálova tajemství 2022", "Fantastic Beasts: The Secrets of Dumbledore"], searched
+# dotazy z matching.build_search_queries: oba názvy s rokem
+assert searched[-1] == ["Fantastická zvířata: Brumbálova tajemství 2022", "Fantastic Beasts: The Secrets of Dumbledore 2022"], searched
 assert matches[-1] == {"mediatype": "movie", "title": "Fantastická zvířata: Brumbálova tajemství",
                        "originaltitle": "Fantastic Beasts: The Secrets of Dumbledore", "year": "2022"}, matches
 log.clear(); k.get_tmdb = lambda: FakeTMDB(exc=TMDBAuthError("x"))

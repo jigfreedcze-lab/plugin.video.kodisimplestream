@@ -33,9 +33,12 @@ from resources.lib.source_ui import (
     source_title_label,
 )
 from resources.lib.matching import (
+    LANG_PREF_BONUS,
+    build_search_queries,
     build_tmdbh_queries,
     parse_quality,
     parse_size,
+    rank_files,
     score_episode_result,
     score_movie_result,
 )
@@ -75,9 +78,8 @@ def _resolution_badge_art(source: Dict[str, Any], fallback_image: str = "") -> D
     }
 
 # Index of the "lang_pref" setting → preference understood by matches_language_preference()
+# LANG_PREF_BONUS (matching.py) is added to the match score when sorting, the shown score stays unchanged
 LANG_PREFS = ["", "cz_audio", "cz_subs"]
-# Bonus to the match score (TMDb Helper, TMDb search) when sorting, the shown score stays unchanged
-LANG_PREF_BONUS = 15
 
 def language_preference() -> str:
     """Returns the preferred language variant from add-on settings ("" = no preference)."""
@@ -258,11 +260,13 @@ def list_search_results(
     try:
         seen = set()
         rows = []
+        pages = []
         has_more = False
         next_offset = offset + PAGE_SIZE
         for term in search_terms:
             response = api.search(term, limit=PAGE_SIZE, offset=offset, sort=SORT_VALUES[sort])["response"]
             files = _as_list(response.get("file"))
+            pages.append(files)
             # "total" is unreliable for small result sets, trust it only after a full page
             if len(files) == PAGE_SIZE and int(response.get("total", 0)) > next_offset:
                 has_more = True
@@ -299,22 +303,17 @@ def list_search_results(
         url = get_url(action="choose_sort", query=str(search_terms), sort=sort, **_match_params(match))
         xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=False)
 
-        sources = [(file_info, normalize_source(file_info)) for file_info in rows]
         preference = language_preference()
         if match and sort == 0:
             # Webshare ORs the query words: noise sharing one word with the first query comes before
-            # the right files found by the next one. Score against the TMDb titles like TMDb Helper does.
-            episode = (match.get("mediatype") or "").lower() == "episode"
-            for file_info, source in sources:
-                source["score"] = score_episode_result(file_info, match) if episode else score_movie_result(file_info, match)
-            # Stable sort keeps the Webshare order for equal scores, the language bonus is not shown
-            sources.sort(
-                key=lambda pair: pair[1]["score"] + (LANG_PREF_BONUS if matches_language_preference(pair[1], preference) else 0),
-                reverse=True,
-            )
-        elif preference:
-            # Preferred dub/subtitles first, otherwise keep the Webshare order (stable sort)
-            sources.sort(key=lambda pair: not matches_language_preference(pair[1], preference))
+            # the right files found by the next one. Score against the TMDb titles like TMDb Helper does,
+            # equal scores keep the Webshare order, the language bonus is not shown.
+            sources = [(file_info, normalize_source(file_info)) for file_info in rank_files(pages, match, preference)]
+        else:
+            sources = [(file_info, normalize_source(file_info)) for file_info in rows]
+            if preference:
+                # Preferred dub/subtitles first, otherwise keep the Webshare order (stable sort)
+                sources.sort(key=lambda pair: not matches_language_preference(pair[1], preference))
 
         for file_info, source in sources:
             item = xbmcgui.ListItem(
@@ -435,18 +434,14 @@ def handle_tmdb_selection(tmdb_id: str, search_type: str) -> None:
         return
 
     if search_type == "movie":
-        year = details.get("year")
-        queries: List[str] = [f"{details['title']} {year}" if year else details["title"]]
-        if details.get("original_title") and details["original_title"] != details["title"]:
-            queries.append(details["original_title"])
-        # TMDb titles for the match score – files found by the original title should not end up below noise
+        # TMDb titles for the queries and the match score – files found by the original title should not end up below noise
         match = {
             "mediatype": "movie",
             "title": details["title"],
             "originaltitle": details.get("original_title") or "",
-            "year": year or "",
+            "year": details.get("year") or "",
         }
-        list_search_results(queries, match=match)
+        list_search_results(build_search_queries(match), match=match)
         return
 
     # Series → show list of seasons
@@ -502,10 +497,6 @@ def list_episodes(
         ep_no = ep.get("number") or 0
         label = f"{ep_no}. {ep['title']}"
 
-        queries: List[str] = [f"{series_title} S{season_no:02d}E{ep_no:02d}"]
-        if original_title and original_title != series_title:
-            queries.append(f"{original_title} S{season_no:02d}E{ep_no:02d}")
-
         match = {
             "mediatype": "episode",
             "showname": series_title,
@@ -514,7 +505,7 @@ def list_episodes(
             "episode": ep_no,
             "episode_title": ep.get("title") or "",
         }
-        url = get_url(action="list_search_results", query=str(queries), **_match_params(match))
+        url = get_url(action="list_search_results", query=str(build_search_queries(match)), **_match_params(match))
         xbmcplugin.addDirectoryItem(_handle, url, xbmcgui.ListItem(label=label), isFolder=True)
 
     xbmcplugin.endOfDirectory(_handle)
