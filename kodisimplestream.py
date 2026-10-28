@@ -20,7 +20,9 @@ import xbmc
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
+import xbmcvfs
 
+from resources.lib import preview
 from resources.lib.webshare import WebshareAPI
 from resources.lib.tmdb import TMDB, TMDBAuthError
 from resources.lib.source_ui import (
@@ -111,6 +113,39 @@ def _source_label(source: Dict[str, Any], image: str = "") -> str:
     if image and _preview_thumbs() and quality in ("4K", "FHD", "HD"):
         title = f"[{quality}] {title}"
     return title
+
+def _add_preview_menu(item: xbmcgui.ListItem, file_info: Dict[str, Any], title: str) -> None:
+    """Context menu "Video preview" for files with a Webshare preview stripe."""
+    if not file_info.get("stripe"):
+        return
+    url = get_url(action="preview", ident=file_info.get("ident", ""), stripe=file_info["stripe"],
+                  count=file_info.get("stripe_count") or "", title=title)
+    item.addContextMenuItems([(_addon.getLocalizedString(30059), f"RunPlugin({url})")])  # "Video preview"
+
+def show_preview(ident: str, stripe: str, count: int, title: str) -> None:
+    """Downloads the preview stripe on request and shows its frames one by one."""
+    folder = os.path.join(xbmcvfs.translatePath("special://temp/kodisimplestream/preview"), ident or "unknown")
+    try:
+        frames = preview.load_frames(stripe, count, folder)
+    except Exception as exc:
+        xbmc.log(f"[KodiSimpleStream] preview failed for {ident}: {exc}", xbmc.LOGWARNING)
+        frames = []
+    if frames:
+        preview.show(frames, title, _icon_path_media("white.png"))
+    else:
+        xbmcgui.Dialog().notification(
+            _addon.getAddonInfo("name"),
+            _addon.getLocalizedString(30060),  # "Video preview is not available"
+            xbmcgui.NOTIFICATION_INFO,
+            3000,
+        )
+    # Run from the context menu (handle -1); opened as a folder it must not hang
+    if _handle >= 0:
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
+
+def _icon_path_media(filename: str) -> str:
+    """Bundled image from resources/media."""
+    return os.path.join(_addon.getAddonInfo("path"), "resources", "media", filename)
 
 def get_api() -> Optional[WebshareAPI]:
     """
@@ -346,6 +381,7 @@ def list_search_results(
                 xbmc.LOGDEBUG,
             )
             item.setProperty("IsPlayable", "true")
+            _add_preview_menu(item, file_info, source_title_label(source))
             xbmcplugin.addDirectoryItem(_handle, get_url(action="play_ident", ident=file_info["ident"]), item, isFolder=False)
 
         if has_more:
@@ -600,6 +636,8 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
                 "ident": ident,
                 "name": name,
                 "img": file_info.get("img", ""),
+                "stripe": file_info.get("stripe") or "",
+                "stripe_count": file_info.get("stripe_count") or "",
                 "size": size_bytes,
                 "quality": quality.get("quality", "sd"),
                 "score": score,
@@ -773,6 +811,7 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
         item.setInfo("video", {"title": source["title"], "size": result["size"], "mediatype": "video"})
         item.setArt(_resolution_badge_art(source, result.get("img", "")))
         item.setProperty("IsPlayable", "true")
+        _add_preview_menu(item, result, source_title_label(source))
         xbmcplugin.addDirectoryItem(_handle, get_url(action="play_ident", ident=result["ident"]), item, isFolder=False)
 
     xbmcplugin.setContent(_handle, "videos")
@@ -877,6 +916,8 @@ def router(paramstring: str) -> None:
         search_webshare()
     elif action == "play_ident":
         play_ident(params["ident"])
+    elif action == "preview":
+        show_preview(params.get("ident", ""), params.get("stripe", ""), _int_param(params, "count") or 0, params.get("title", ""))
     elif action == "tmdbh_play":
         tmdbh_play(params)
     elif action == "search_tmdb_movie":
