@@ -199,3 +199,51 @@ msgstr "Volitelné – bez klíče funguje jen hledání na Webshare"
 msgctxt "#30058"
 msgid "Video preview instead of the quality badge"
 msgstr "Náhled videa místo odznaku kvality"
+
+msgctxt "#30059"
+msgid "Video preview"
+msgstr "Náhled videa"
+
+msgctxt "#30060"
+msgid "Video preview is not available"
+msgstr "Náhled videa není k dispozici"
+
+msgctxt "#30061"
+msgid "Video"
+msgstr "Video"
+
+msgctxt "#30062"
+msgid "Bitrate"
+msgstr "Datový tok"
+
+msgctxt "#30063"
+msgid "Length"
+msgstr "Délka"
+
+msgctxt "#30064"
+msgid "Audio"
+msgstr "Zvuk"
+
+msgctxt "#30065"
+msgid "Size"
+msgstr "Velikost"
+
+msgctxt "#30066"
+msgid "Container"
+msgstr "Kontejner"
+
+msgctxt "#30067"
+msgid "Details are not available"
+msgstr "Podrobnosti nejsou k dispozici"
+
+msgctxt "#30068"
+msgid "Subtitles"
+msgstr "Titulky"
+
+msgctxt "#30069"
+msgid "Context menu: Video preview"
+msgstr "Kontextová nabídka: Náhled videa"
+
+msgctxt "#30070"
+msgid "Not analysed by Webshare yet"
+msgstr "Webshare soubor zatím neanalyzoval"

@@ -24,6 +24,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 
+from resources.lib import preview
 from resources.lib.webshare import WebshareAPI, WebshareError, WebshareStatusError
 from resources.lib.tmdb import TMDB, TMDBAuthError
 from resources.lib.source_ui import (
@@ -114,6 +115,106 @@ def _source_label(source: Dict[str, Any], image: str = "") -> str:
     if image and _preview_thumbs() and quality in ("4K", "FHD", "HD"):
         title = f"[{quality}] {title}"
     return title
+
+def _has_preview(file_info: Dict[str, Any]) -> bool:
+    return preview.is_stripe_url(file_info.get("stripe")) and preview.is_valid_ident(file_info.get("ident"))
+
+def _add_preview_menu(item: xbmcgui.ListItem, file_info: Dict[str, Any], title: str) -> None:
+    """Context menu "Video preview" for files with a Webshare preview stripe."""
+    if not _has_preview(file_info):
+        return
+    # The window shows the full file name and, until file_info arrives or when it fails, the size of the list
+    url = get_url(action="preview", ident=file_info["ident"], stripe=file_info["stripe"],
+                  count=file_info.get("stripe_count") or "", title=file_info.get("name") or title,
+                  size=file_info.get("size") or "")
+    item.addContextMenuItems([(_addon.getLocalizedString(30059), f"RunPlugin({url})")])  # "Video preview"
+
+def _source_plot(source: Dict[str, Any], has_preview: bool = False) -> str:
+    """Text for Kodi's Information dialog of a source row, from what the list already knows."""
+    lines = [source.get("original_name") or source.get("title") or ""]
+    quality, resolution = source.get("quality_label") or "SD", source.get("resolution_label") or "SD"
+    if quality == resolution == "SD":
+        quality = ""  # no quality in the file name: "SD" would be a guess, the preview shows the real one
+    elif quality != resolution:
+        quality = f"{quality} {resolution}"  # "FHD 1080p"
+    lines.append(" · ".join(part for part in (quality, source.get("size_text")) if part))
+    languages = []
+    if source.get("audio_langs"):
+        languages.append(f"{_addon.getLocalizedString(30064)}: {'/'.join(source['audio_langs'])}")  # "Audio"
+    if source.get("subtitle_langs"):
+        languages.append(f"{_addon.getLocalizedString(30068)}: {'/'.join(source['subtitle_langs'])}")  # "Subtitles"
+    lines.append(" · ".join(languages))
+    lines.append(" · ".join(source[key] for key in ("source_type", "codec", "audio_format") if source.get(key)))
+    if has_preview:
+        lines.append(_addon.getLocalizedString(30069))  # "Context menu: Video preview"
+    return "[CR]".join(line for line in lines if line)
+
+_PREVIEW_PROPERTY = "kodisimplestream.preview"
+# A guard older than this is left over from a script that did not get to its finally (killed invoker)
+_PREVIEW_GUARD_SECONDS = 600
+
+def _preview_running(home: xbmcgui.Window) -> bool:
+    """True while another preview script holds the guard on the home window."""
+    try:
+        return time.time() - float(home.getProperty(_PREVIEW_PROPERTY) or 0) < _PREVIEW_GUARD_SECONDS
+    except ValueError:
+        return False
+
+def show_preview(ident: str, stripe: str, count: int, title: str, size: str = "") -> None:
+    """Downloads the preview stripe on request and shows its frames one by one."""
+    # RunPlugin starts a new script per request: a second "Video preview" while the first one is
+    # still downloading would cut the same files and stack a second window, so it is ignored
+    home = xbmcgui.Window(10000)
+    if _preview_running(home):
+        xbmc.log("[KodiSimpleStream] preview already running, request ignored", xbmc.LOGINFO)
+    else:
+        home.setProperty(_PREVIEW_PROPERTY, str(time.time()))
+        try:
+            _show_preview(ident, stripe, count, title, size)
+        finally:
+            home.clearProperty(_PREVIEW_PROPERTY)
+    # Run from the context menu (handle -1); opened as a folder it must not hang
+    if _handle >= 0:
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
+
+# Row names of the details panel in the preview window
+_DETAIL_LABELS = {"video": 30061, "bitrate": 30062, "length": 30063, "audio": 30064,
+                  "size": 30065, "container": 30066, "unavailable": 30067, "unanalysed": 30070}
+
+def _show_preview(ident: str, stripe: str, count: int, title: str, size: str = "") -> None:
+    """Busy dialog while the stripe and file_info load (in parallel), then the window;
+    a failure of the frames ends in the 30060 notification, file_info only fills the details."""
+    try:
+        xbmc.executebuiltin("ActivateWindow(busydialognocancel)")
+        try:
+            # Invalid ident or URL (edited plugin URL), download error, broken image or Pillow missing
+            folder = preview.cache_folder(ident)
+            details = preview.FileInfoRequest(ident, folder)  # HTTP in a background thread
+            frames = preview.load_frames(stripe, count, folder)
+            info = details.result() if frames else None
+        finally:
+            xbmc.executebuiltin("Dialog.Close(busydialognocancel)")
+        if frames:
+            if info is None:
+                reason = f"{type(details.error).__name__}: {details.error}" if details.error else "late or not OK"
+                xbmc.log(f"[KodiSimpleStream] file_info unavailable for {ident!r}: {reason}", xbmc.LOGINFO)
+            labels = {key: _addon.getLocalizedString(string_id) for key, string_id in _DETAIL_LABELS.items()}
+            rows = preview.details_rows(info, size, labels)
+            # A frame removed from special://temp meanwhile, a window error: a notification, not the script error dialog
+            preview.show(frames, title or (info or {}).get("name", ""), _icon_path_media("white.png"), rows)
+            return
+    except Exception as exc:
+        xbmc.log(f"[KodiSimpleStream] preview failed for {ident!r}: {type(exc).__name__}: {exc}", xbmc.LOGWARNING)
+    xbmcgui.Dialog().notification(
+        _addon.getAddonInfo("name"),
+        _addon.getLocalizedString(30060),  # "Video preview is not available"
+        xbmcgui.NOTIFICATION_INFO,
+        3000,
+    )
+
+def _icon_path_media(filename: str) -> str:
+    """Bundled image from resources/media."""
+    return os.path.join(_addon.getAddonInfo("path"), "resources", "media", filename)
 
 def get_api() -> WebshareAPI:
     """Returns the Webshare client of this plugin call. Searching needs no login, see login_api()."""
@@ -374,6 +475,7 @@ def list_search_results(
             item.setInfo("video", {
                 "title": source.get("title") or file_info.get("name", ""),
                 "size": source.get("size_bytes", 0),
+                "plot": _source_plot(source, _has_preview(file_info)),
                 "mediatype": "video",
             })
             item.setArt(_resolution_badge_art(source, file_info.get("img", "")))
@@ -383,6 +485,7 @@ def list_search_results(
                 xbmc.LOGDEBUG,
             )
             item.setProperty("IsPlayable", "true")
+            _add_preview_menu(item, file_info, source_title_label(source))
             xbmcplugin.addDirectoryItem(_handle, get_url(action="play_ident", ident=file_info["ident"]), item, isFolder=False)
 
         if has_more:
@@ -642,6 +745,8 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
                 "ident": ident,
                 "name": name,
                 "img": file_info.get("img", ""),
+                "stripe": file_info.get("stripe") or "",
+                "stripe_count": file_info.get("stripe_count") or "",
                 "size": size_bytes,
                 "quality": quality.get("quality", "sd"),
                 "score": score,
@@ -745,6 +850,7 @@ def _tmdbh_source_listitem(result: Dict[str, Any]) -> xbmcgui.ListItem:
     item.setInfo("video", {
         "title": source.get("title") or result.get("name", ""),
         "size": source.get("size_bytes", result.get("size", 0)),
+        "plot": _source_plot(source),
         "mediatype": "video",
     })
     item.setArt(_resolution_badge_art(source, result.get("img", "")))
@@ -845,9 +951,11 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
             label=_source_label(source, result.get("img", "")),
             label2=metadata_line(source, include_score=True, include_quality=True),
         )
-        item.setInfo("video", {"title": source["title"], "size": result["size"], "mediatype": "video"})
+        item.setInfo("video", {"title": source["title"], "size": result["size"], "mediatype": "video",
+                               "plot": _source_plot(source, _has_preview(result))})
         item.setArt(_resolution_badge_art(source, result.get("img", "")))
         item.setProperty("IsPlayable", "true")
+        _add_preview_menu(item, result, source_title_label(source))
         xbmcplugin.addDirectoryItem(_handle, get_url(action="play_ident", ident=result["ident"]), item, isFolder=False)
 
     xbmcplugin.setContent(_handle, "videos")
@@ -957,6 +1065,9 @@ def router(paramstring: str) -> None:
         search_webshare()
     elif action == "play_ident":
         play_ident(params["ident"])
+    elif action == "preview":
+        show_preview(params.get("ident", ""), params.get("stripe", ""), _int_param(params, "count") or 0,
+                     params.get("title", ""), params.get("size", ""))
     elif action == "tmdbh_play":
         tmdbh_play(params)
     elif action == "search_tmdb_movie":
