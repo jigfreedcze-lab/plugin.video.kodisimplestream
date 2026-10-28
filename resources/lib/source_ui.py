@@ -7,10 +7,10 @@ import re
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 _LANGUAGE_ALIASES = (
-    ("CZ", ("cz", "czech", "cesky", "česky", "cestina", "čeština")),
+    ("CZ", ("cz", "cze", "czech", "cesky", "česky", "cestina", "čeština")),
     ("SK", ("sk", "slovak", "slovensky", "slovenský", "slovencina", "slovenčina")),
     ("EN", ("en", "eng", "english")),
-    ("JA", ("ja", "jpn", "japanese", "japan")),
+    ("JA", ("ja", "jap", "jpn", "japanese", "japan")),
 )
 
 _LANGUAGE_FIELD_HINTS = ("lang", "language", "audio", "subtitle", "subtitles", "subs")
@@ -150,29 +150,79 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
         for lang in _languages_from_text(field_text):
             _append_unique(subtitle_langs, lang)
 
-    normalized = re.sub(r"[._\-+\[\]()]", " ", _clean_text(text).lower())
+    lowered = _clean_text(text).lower()
+    # A track count glued to the code ("2xCZ", "4xEN-4xCZ", "CZE3x") still names the audio language.
+    lowered = re.sub(r"(?<![a-z0-9])\d+x(?=(?:cz|cze|sk|en|eng)(?![a-z]))", " ", lowered)
+    lowered = re.sub(r"(?<![a-z0-9])(cz|cze|sk|en|eng)\d+x(?![a-z0-9])", r"\1", lowered)
+    # "spaced" keeps "+" and "," for language lists, "normalized" is the same text without "+" (same length).
+    spaced = re.sub(r"[._\-\[\]()]", " ", lowered)
+    normalized = spaced.replace("+", " ")
     all_langs = _languages_from_text(normalized)
 
+    # A code (or tag) assigned by a pattern is blanked out with "#", so the patterns after it and the bare
+    # tokens below do not read it again, and a blank never joins the words around it.
+    bare = list(spaced)
+
+    def unread() -> str:
+        return "".join(bare).replace("+", " ")
+
+    def consume(start: int, end: int) -> None:
+        bare[start:end] = "#" * (end - start)
+
+    # A list of languages joined by "+" or "," next to the dub word ("CZ+EN Dabing", "audio.EN,CZ") is all dubs,
+    # even if one of them also has subtitles ("[CZ+EN Dabing] [CZ Titulky]").
+    # Like a single language, a list between the dub word and "titulky" is the subtitles ("SK dabing CZ+EN titulky"),
+    # unless "titulky" has its own language ("audio CZ+EN tit CZ").
+    lang_list = r"(?P<langs>(?:cz|cze|sk|en|eng|ja|jap)(?:\s*[+,]\s*(?:cz|cze|sk|en|eng|ja|jap))+)(?!\w)"
+    list_patterns = (
+        r"(?<!\w)" + lang_list + r"\s+(?:audio|dub(?:bing)?|dab(?:ing)?)(?!\w)",
+        r"(?<!\w)(?:audio|dub(?:bing)?|dab(?:ing)?)\s+" + lang_list
+        + r"(?P<subs>\s+(?:titulk\w*|tit)(?!\w)(?!\s+(?:cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|jap|japanese)(?!\w)))?",
+    )
+    for pattern in list_patterns:
+        for match in re.finditer(pattern, "".join(bare), re.IGNORECASE):
+            subs = match.groupdict().get("subs")
+            for lang in _languages_from_text(match.group("langs")):
+                _append_unique(subtitle_langs if subs else audio_langs, lang)
+            consume(*match.span("langs"))
+            if subs:
+                consume(*match.span("subs"))
+
     audio_patterns = (
-        # not followed by the Czech "titulky": "SK dabing CZ titulky" is a Slovak dub with Czech subtitles.
+        # not followed by the Czech "titulky" or "tit": "SK dabing CZ titulky" is a Slovak dub with Czech subtitles.
         # English tags put the language after the word ("dub CZ sub EN"), there the language belongs to the dub.
-        r"(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)\s+(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)"
-        r"(?!\s+titulk)",
-        r"(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)\s+(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)",
+        # A dub word with its language in front ("CZ_EN.dub_CZ.sub", "CZ+EN dub CZ sub") does not take the one
+        # after it, that one is left for the subtitle word.
+        r"(?:(?<!\w)(?P<pre>cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|jap|japanese|#+)\s+)?"
+        r"(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)\s+(?P<lang>cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|jap|japanese)"
+        r"(?!\w)(?!\s+(?:titulk|tit(?!\w)))",
+        r"(?<!\w)(?P<lang>cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|jap|japanese)\s+(?:audio|dub(?:bing)?|dab(?:ing)?|lang(?:uage)?)",
     )
     for pattern in audio_patterns:
-        for match in re.finditer(pattern, normalized, re.IGNORECASE):
+        for match in re.finditer(pattern, unread(), re.IGNORECASE):
+            if match.groupdict().get("pre"):
+                continue
             for lang in _languages_from_text(match.group("lang")):
                 _append_unique(audio_langs, lang)
+            consume(*match.span("lang"))
 
-    subtitle_patterns = (
-        r"(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english)\s+(?:titulk\w*|subs?|subtitles?)",
-        r"(?:titulk\w*|subs?|subtitles?)\s+(?P<lang>cz|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|japanese)",
-    )
-    for pattern in subtitle_patterns:
-        for match in re.finditer(pattern, normalized, re.IGNORECASE):
+    # Each subtitle word takes one language. The Czech words take the one before them ("CZ titulky",
+    # "CZ tit EN" = EN audio), the English ones the one after them ("dub CZ sub EN", "ENG CZE sub CZE" = EN+CZ
+    # audio), the other side only when the preferred one has none ("TIT CZ", "CZ subs"). A code already read as
+    # the dub stays the dub. "tit" and "subt" are common short forms ("CZ.tit", "cz-tit", "subt.CZ"), only as
+    # whole words, so "Petit CZ" or "subtle CZ" keep CZ as audio.
+    sub_lang_before = r"(?<!\w)(?P<lang>cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english)\s+$"
+    sub_lang_after = r"\s+(?P<lang>cz|cze|czech|cesky|česky|sk|slovak|slovensky|en|eng|english|ja|jap|japanese)(?!\w)"
+    for word in re.finditer(r"(?<!\w)(?:(?P<cs>titulk\w*|tit)|(?:hard|soft)?sub(?:s|bed)?|subt(?:i\w*)?)(?!\w)", unread(), re.IGNORECASE):
+        current = unread()
+        before = re.search(sub_lang_before, current[:word.start()], re.IGNORECASE)
+        after = re.match(sub_lang_after, current[word.end():], re.IGNORECASE)
+        sides = ((0, before), (word.end(), after)) if word.group("cs") else ((word.end(), after), (0, before))
+        offset, match = next(((start, found) for start, found in sides if found), (0, None))
+        if match:
             for lang in _languages_from_text(match.group("lang")):
                 _append_unique(subtitle_langs, lang)
+            consume(offset + match.start("lang"), offset + match.end("lang"))
 
     embedded_subs = re.search(r"(?:vlo[zž]en[éeýy]?|embedded\s+subs?)", normalized, re.IGNORECASE)
     if embedded_subs:
@@ -180,8 +230,8 @@ def detect_languages(text: str, result: Any = None) -> Tuple[List[str], List[str
             _append_unique(subtitle_langs, lang)
 
     # A bare language token in a release name usually describes audio/dubbing, not subtitles.
-    for lang in all_langs:
-        if lang not in subtitle_langs:
+    for lang in _languages_from_text(unread()):
+        if not (embedded_subs and lang in subtitle_langs):
             _append_unique(audio_langs, lang)
 
     # Czech words without a language code: "dabing" means a Czech dub, "titulky" Czech subtitles.
