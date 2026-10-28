@@ -304,6 +304,7 @@ class FileInfoRequest:
         self.info: Optional[Dict[str, Any]] = None
         self.error: Optional[BaseException] = None
         self.started = time.monotonic()
+        _http()  # build the shared session here: the download in the main thread uses it at the same time
         self._thread = threading.Thread(target=self._run, args=(ident, folder), daemon=True)
         self._thread.start()
 
@@ -611,9 +612,10 @@ def show(frames: List[str], title: str, background: str, details: Sequence[Tuple
                 self.image.setImage(frames[index], False)
                 self.counter.setLabel(f"{index + 1}/{len(frames)}")
                 index = (index + 1) % len(frames)
+                # On Kodi exit doModal() closes the window itself; close() from this thread would
+                # block on a GUI message during the shutdown
                 if monitor.waitForAbort(FRAME_SECONDS):
                     self.stopped.set()
-                    self.close()
 
     window = PreviewWindow()
     thread = threading.Thread(target=window.cycle, daemon=True)

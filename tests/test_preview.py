@@ -86,7 +86,10 @@ class WindowDialog:
                 self.onClick(1)
             elif not 100 <= action_id <= 109 or self.focused is not None:
                 self.onAction(Action(action_id))
-        assert self.closed.wait(2), "window not closed"
+        deadline = time.time() + 2
+        while not self.closed.is_set() and not Monitor.abort and time.time() < deadline:
+            time.sleep(0.01)
+        assert self.closed.is_set() or Monitor.abort, "window not closed"
 
 shown, labels, controls = [], [], []
 class ControlImage:
