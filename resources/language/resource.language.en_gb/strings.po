@@ -41,8 +41,8 @@ msgid "Not Found"
 msgstr  "Not Found"
 
 msgctxt "#30009"
-msgid "No credentials"
-msgstr  "Login to Webshare.cz in addon settings"
+msgid "Enter your Webshare.cz username and password in the add-on settings"
+msgstr "Enter your Webshare.cz username and password in the add-on settings"
 
 msgctxt "#30010"
 msgid "Webshare Settings"

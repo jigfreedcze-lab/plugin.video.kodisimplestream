@@ -282,3 +282,12 @@ groups += 1
 
 print(f"webshare výpis: {groups} skupin kontrol prošlo")
 
+# 14. TMDb Helper bez přihlášení k Webshare: jen hláška z get_api, žádné „nenalezeno“ ani nové hledání
+log.clear(); k.get_api = lambda: None
+called = []
+k.search_and_score_tmdbh = lambda *a, **kw: called.append("search") or []
+k.tmdbh_play({"mediatype": "movie", "title": "Film", "year": "2020"})
+assert called == [] and log == [("resolved", False, "")], log
+log.clear(); k.list_tmdbh_sources({"mediatype": "movie", "title": "Film"})
+assert called == [] and log == [("end", False, False)], log
+print("tmdbh bez přihlášení: OK")

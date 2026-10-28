@@ -740,6 +740,10 @@ def select_tmdbh_source(params: Dict[str, Any]) -> None:
 
 
 def list_tmdbh_sources(params: Dict[str, Any]) -> None:
+    # Without a Webshare login get_api() already told the user, "no sources" would be misleading
+    if not get_api():
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
+        return
     results = search_and_score_tmdbh(params)
     if not results:
         xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
@@ -783,6 +787,10 @@ def tmdbh_play(params: Dict[str, Any]) -> None:
     queries = build_tmdbh_queries(params)
     if not queries:
         xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "Missing required metadata for TMDb Helper search", xbmcgui.NOTIFICATION_ERROR, 4000)
+        xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+        return
+    # Without a Webshare login get_api() already told the user – do not report "no sources" or offer a new search
+    if not get_api():
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
 
