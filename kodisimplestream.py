@@ -24,7 +24,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 
-from resources.lib import preview
+from resources.lib import file_details, preview, source_ui
 from resources.lib.webshare import WebshareAPI, WebshareError, WebshareStatusError
 from resources.lib.tmdb import TMDB, TMDBAuthError
 from resources.lib.source_ui import (
@@ -38,6 +38,7 @@ from resources.lib.source_ui import (
 )
 from resources.lib.matching import (
     LANG_PREF_BONUS,
+    autoplay_concern,
     build_search_queries,
     build_tmdbh_queries,
     parse_quality,
@@ -75,6 +76,11 @@ def _preview_thumbs() -> bool:
     """Video preview from Webshare instead of the quality badge (setting, on by default)."""
     return _addon.getSetting("preview_thumbs") != "false"
 
+def _file_details_enabled() -> bool:
+    """Automatic Webshare file_info for lists, the TMDb Helper picker and auto-play (setting, on by default).
+    The video preview asks for the details itself and is not affected."""
+    return _addon.getSetting("file_details") != "false"
+
 def _resolution_badge_art(source: Dict[str, Any], fallback_image: str = "") -> Dict[str, str]:
     """Artwork for source rows: the Webshare video preview, or the bundled resolution badge."""
     badge = _icon_path(source_icon_name(source))
@@ -100,11 +106,11 @@ def language_preference() -> str:
         index = 0
     return LANG_PREFS[index] if 0 <= index < len(LANG_PREFS) else ""
 
-def _source_label(source: Dict[str, Any], image: str = "") -> str:
+def _source_label(source: Dict[str, Any], image: str = "", quality_tag: bool = True) -> str:
     """Title label with tags in front, e.g. "[FHD] [CZ dabing] Film".
 
     The quality tag is added when the preview replaces the quality badge; SD is left out,
-    it mostly means "not in the file name".
+    it mostly means "not in the file name". quality_tag=False where label2 starts with the quality anyway.
     """
     title = source_title_label(source)
     lang, kind = language_tag(source)
@@ -112,9 +118,85 @@ def _source_label(source: Dict[str, Any], image: str = "") -> str:
         word = _addon.getLocalizedString(30042 if kind == "audio" else 30043)  # "dabing" / "titulky"
         title = f"[{lang} {word}] {title}"
     quality = source.get("quality_label") or ""
-    if image and _preview_thumbs() and quality in ("4K", "FHD", "HD"):
+    # The real resolution from file_info is shown also when it is SD
+    if quality_tag and image and _preview_thumbs() and (
+            quality in ("4K", "FHD", "HD") or (quality and source.get("real_resolution"))):
         title = f"[{quality}] {title}"
     return title
+
+# Orange (AARRGGBB) of the length warning (the length itself is in label2, see source_ui.metadata_line)
+WARNING_COLOR = source_ui.WARNING_COLOR
+# file_info audio languages added to a search result: normalize_source reads a field named like this
+# as audio languages, so a CZE track counts as a Czech dub for the tag and the language preference
+DETAILS_AUDIO_KEY = "audio_languages"
+
+def _with_details(file_info: Dict[str, Any], info: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The search result with the audio languages of its file_info (only those found; none removed)."""
+    languages = file_details.audio_languages(info)
+    return {**file_info, DETAILS_AUDIO_KEY: languages} if languages else file_info
+
+def _apply_details(source: Dict[str, Any], info: Optional[Dict[str, Any]], runtime: Optional[float] = None,
+                   mediatype: str = "movie") -> Dict[str, Any]:
+    """Real resolution, length and the length check from file_info; without it the name guesses stay."""
+    if not info:
+        return source
+    source["details"] = info
+    real = file_details.resolution(info)
+    if real:
+        source["quality_label"], source["resolution_label"] = real
+        source["real_resolution"] = True
+    source["length_text"] = preview.format_duration(file_details.length_seconds(info))
+    source["length_mismatch"] = file_details.length_mismatch(info, runtime, mediatype)
+    source["runtime"] = runtime
+    return source
+
+def _set_stream_details(item: xbmcgui.ListItem, source: Dict[str, Any]) -> None:
+    """Duration and stream flags (resolution, codecs, audio channels and languages) for the skin."""
+    info = source.get("details")
+    if not info:
+        return
+    seconds = file_details.length_seconds(info)
+    video = file_details.video_stream(info)
+    audios = file_details.audio_streams(info)
+    if not hasattr(xbmc, "VideoStreamDetail"):
+        # Kodi 19 (xbmc.python 3.0.0): the InfoTagVideo setters and the stream classes came in Kodi 20,
+        # ListItem.addStreamInfo is there (deprecated since 20, reads every value as a string);
+        # a video stream's duration is the length
+        stream = dict(video or {}, duration=int(round(seconds or 0)))
+        if video or seconds:
+            item.addStreamInfo("video", {key: str(value) for key, value in stream.items() if value})
+        for audio in audios:
+            known = {key: str(value) for key, value in audio.items() if value and value != -1}
+            if known:
+                item.addStreamInfo("audio", known)
+        return
+    tag = item.getVideoInfoTag()
+    if seconds:
+        tag.setDuration(int(round(seconds)))
+    if video:
+        tag.addVideoStream(xbmc.VideoStreamDetail(width=video["width"], height=video["height"],
+                                                  duration=video["duration"], codec=video["codec"]))
+    for audio in audios:
+        tag.addAudioStream(xbmc.AudioStreamDetail(audio["channels"], audio["codec"], audio["language"]))
+
+def _details_lines(source: Dict[str, Any]) -> List[str]:
+    """Plot lines with the real details: video, bitrate, length, audio tracks (one line), container."""
+    info = source.get("details")
+    if not info:
+        return []
+    labels = {key: _addon.getLocalizedString(string_id) for key, string_id in _DETAIL_LABELS.items()}
+    lines: List[str] = []
+    for label, value in preview.details_rows(info, "", labels):
+        if label == labels["size"]:
+            continue  # already on the second line
+        if label or not lines:
+            lines.append(f"{label}: {value}" if label else value)
+        else:
+            lines[-1] += f", {value}"  # the next audio track
+    if source.get("length_mismatch") and source.get("runtime"):
+        warning = _addon.getLocalizedString(30073).format(int(round(source["runtime"])))  # "Length does not match…"
+        lines.append(f"[COLOR {WARNING_COLOR}]{warning}[/COLOR]")
+    return lines
 
 def _has_preview(file_info: Dict[str, Any]) -> bool:
     return preview.is_stripe_url(file_info.get("stripe")) and preview.is_valid_ident(file_info.get("ident"))
@@ -139,12 +221,16 @@ def _source_plot(source: Dict[str, Any], has_preview: bool = False) -> str:
         quality = f"{quality} {resolution}"  # "FHD 1080p"
     lines.append(" · ".join(part for part in (quality, source.get("size_text")) if part))
     languages = []
-    if source.get("audio_langs"):
+    # The label's languages (file name + a CZE track from file_info), unless the file_info tracks below
+    # already name all of them – an UND/ENG-tagged track must not hide a CZ known from the name
+    tracks = file_details.audio_languages(source.get("details"))
+    if source.get("audio_langs") and not set(source["audio_langs"]) <= set(tracks):
         languages.append(f"{_addon.getLocalizedString(30064)}: {'/'.join(source['audio_langs'])}")  # "Audio"
     if source.get("subtitle_langs"):
         languages.append(f"{_addon.getLocalizedString(30068)}: {'/'.join(source['subtitle_langs'])}")  # "Subtitles"
     lines.append(" · ".join(languages))
     lines.append(" · ".join(source[key] for key in ("source_type", "codec", "audio_format") if source.get(key)))
+    lines.extend(_details_lines(source))
     if has_preview:
         lines.append(_addon.getLocalizedString(30069))  # "Context menu: Video preview"
     return "[CR]".join(line for line in lines if line)
@@ -198,6 +284,11 @@ def _show_preview(ident: str, stripe: str, count: int, title: str, size: str = "
             if info is None:
                 reason = f"{type(details.error).__name__}: {details.error}" if details.error else "late or not OK"
                 xbmc.log(f"[KodiSimpleStream] file_info unavailable for {ident!r}: {reason}", xbmc.LOGINFO)
+            else:
+                # The lists show the details of a previewed file too (the preview folders are pruned sooner)
+                cache = _details_cache()
+                cache.put(ident, info)
+                cache.save()
             labels = {key: _addon.getLocalizedString(string_id) for key, string_id in _DETAIL_LABELS.items()}
             rows = preview.details_rows(info, size, labels)
             # A frame removed from special://temp meanwhile, a window error: a notification, not the script error dialog
@@ -215,6 +306,178 @@ def _show_preview(ident: str, stripe: str, count: int, title: str, size: str = "
 def _icon_path_media(filename: str) -> str:
     """Bundled image from resources/media."""
     return os.path.join(_addon.getAddonInfo("path"), "resources", "media", filename)
+
+# ----------------------------------------------------------------------------
+# File details (Webshare file_info) for the result lists
+# ----------------------------------------------------------------------------
+#
+# A listing is shown at once with what the cache knows. Kodi fetches a listing outside its main thread
+# and then shows it only when the script has ended (Kodi 21 CScriptRunner::WaitOnScriptResult waits up
+# to 30 s for the script after endOfDirectory, CPythonInvoker waits for the script's threads), so the
+# missing details are not fetched by the listing itself:
+# it starts a separate script (RunPlugin, handle -1) for the top rows and ends. That script fetches
+# them (bounded time, at most 4 requests at once), caches them and refreshes the list once, only if
+# the same listing is still open. The refreshed call finds the marker of this one refresh, uses the
+# cached search answers and the cached details and never starts another fetch, so it cannot loop.
+
+ENRICH_PROPERTY = "kodisimplestream.details_job"     # the job of the newest listing: token, listing key, idents
+LISTING_PROPERTY = "kodisimplestream.details_listing"  # search answers of that listing for its refresh
+REFRESH_PROPERTY = "kodisimplestream.details_refresh"  # marker: the next call of this listing is the refresh
+# The same listing starts no second job within this time (Back and forth, a refresh without the marker)
+ENRICH_GUARD_SECONDS = 60
+# The details script refreshes the list only this long after the listing started it
+REFRESH_WINDOW = 20
+# The refreshed listing must run within this time after the marker was set
+REFRESH_MARKER_SECONDS = 30
+_LISTING_ACTIONS = ("list_search_results", "search_webshare", "select_tmdb")
+_refresh_pass = False  # set by router(): this call is the one refresh of its listing
+
+def _home() -> Optional[xbmcgui.Window]:
+    try:
+        return xbmcgui.Window(10000)
+    except Exception:  # stubbed or failing GUI: the details just are not cached for the session
+        return None
+
+def _json_property(window: Optional[xbmcgui.Window], name: str) -> Dict[str, Any]:
+    if window is None:
+        return {}
+    try:
+        value = json.loads(window.getProperty(name) or "{}")
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+def _details_cache() -> file_details.DetailsCache:
+    """Session cache in the home window, persistent cache in addon_data, the preview's info.json as a fallback."""
+    try:
+        import xbmcvfs
+
+        folder = xbmcvfs.translatePath(_addon.getAddonInfo("profile"))
+        previews = xbmcvfs.translatePath(preview.CACHE_ROOT)
+    except Exception:  # no xbmcvfs (tests) or no profile: the session cache only
+        folder = previews = ""
+    return file_details.DetailsCache(_home(), folder, previews)
+
+def _listing_key(path: str) -> str:
+    """A plugin URL with its parameters in a fixed order, for comparing with Container.FolderPath."""
+    base, _, query = (path or "").partition("?")
+    return f"{base.rstrip('/')}?{urlencode(sorted(parse_qsl(query)))}"
+
+def _current_listing_key() -> str:
+    return _listing_key(_url + (sys.argv[2] if len(sys.argv) > 2 else ""))
+
+def _take_refresh_marker() -> Tuple[bool, Dict[str, Any]]:
+    """(is the one refresh of this listing, the cached listing or {}); the marker is used up."""
+    home = _home()
+    marker = _json_property(home, REFRESH_PROPERTY)
+    if not marker:
+        return False, {}
+    try:
+        fresh = 0 <= time.time() - float(marker.get("time") or 0) < REFRESH_MARKER_SECONDS
+    except (TypeError, ValueError):
+        fresh = False
+    key = _current_listing_key()
+    if fresh and marker.get("key") != key:
+        return False, {}  # for another listing, which may still come
+    home.clearProperty(REFRESH_PROPERTY)
+    if not fresh:
+        return False, {}
+    listing = _json_property(home, LISTING_PROPERTY)
+    return True, listing if listing.get("key") == key else {}
+
+def _start_details(idents: List[str], top: List[str], listing: Dict[str, Any]) -> None:
+    """Starts the details script for the unknown ones (idents) of the top rows of the listing being built
+    (not in its refresh)."""
+    if _handle < 0 or _refresh_pass or not _file_details_enabled():
+        return
+    home = _home()
+    if home is None:
+        return
+    job = _json_property(home, ENRICH_PROPERTY)
+    if job and job.get("key") == listing["key"] and job.get("top") != top:
+        # Another listing on the same URL (a new keyboard search): the job of the old one must not
+        # refresh this one with the old search answers, its script ends on the token check
+        home.clearProperty(ENRICH_PROPERTY)
+        home.clearProperty(LISTING_PROPERTY)
+        job = {}
+    if not idents or file_details.blocked(home):
+        return
+    try:
+        recent = 0 <= time.time() - float(job.get("time") or 0) < ENRICH_GUARD_SECONDS
+    except (TypeError, ValueError):
+        recent = False
+    # The same rows of the same listing; a new keyboard search has the same URL but other rows
+    if recent and job.get("key") == listing["key"] and job.get("idents") == idents:
+        return
+    token = hashlib.sha1(f"{listing['key']}|{time.time()}".encode("utf-8")).hexdigest()[:12]
+    home.setProperty(LISTING_PROPERTY, json.dumps(listing, ensure_ascii=False, separators=(",", ":")))
+    home.setProperty(ENRICH_PROPERTY, json.dumps({"token": token, "key": listing["key"], "idents": idents,
+                                                   "top": top, "time": time.time()}, separators=(",", ":")))
+    xbmc.executebuiltin(f"RunPlugin({get_url(action='file_details', token=token)})")
+
+def fetch_details(token: str) -> None:
+    """The details script of a listing (RunPlugin, handle -1): file_info of its top rows, then one refresh."""
+    if _handle >= 0:  # opened as a folder (edited URL): nothing to list
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
+        return
+    home = _home()
+    job = _json_property(home, ENRICH_PROPERTY)
+    if not token or job.get("token") != token or not isinstance(job.get("idents"), list) or file_details.blocked(home):
+        return
+    cache = _details_cache()
+    idents = [ident for ident in job["idents"][:file_details.LIST_COUNT]
+              if isinstance(ident, str) and preview.is_valid_ident(ident) and not cache.known(ident)]
+    if not idents:
+        return
+    monitor = xbmc.Monitor()
+
+    def superseded() -> bool:
+        # Kodi exits, or a newer listing started its own job (or a new search on the same URL cleared
+        # this one): no further request starts here, so two jobs never run 4 workers each for long
+        return monitor.abortRequested() or _json_property(home, ENRICH_PROPERTY).get("token") != token
+
+    fetcher = file_details.Fetcher(idents, file_details.LIST_BUDGET)
+    arrived = fetcher.wait(file_details.LIST_BUDGET + 1, superseded)
+    fetcher.stop()
+    found = _store_details(cache, fetcher, arrived, home)
+    xbmc.log(f"[KodiSimpleStream] file_info for the list: {len(arrived)}/{len(idents)} answers, {found} with details, "
+             f"{time.monotonic() - fetcher.started:.2f} s{_fetch_problem(fetcher)}", xbmc.LOGINFO)
+    if found:
+        _refresh_listing(home, job, monitor)
+
+def _store_details(cache: file_details.DetailsCache, fetcher: file_details.Fetcher,
+                   arrived: Dict[str, Optional[Dict[str, Any]]], home: Optional[xbmcgui.Window]) -> int:
+    """Caches the answers (main thread), returns how many have details."""
+    for ident, info in arrived.items():
+        cache.put(ident, info)
+    if fetcher.blocked:
+        file_details.block(home)
+    cache.save()
+    return sum(1 for info in arrived.values() if info and preview.is_analysed(info))
+
+def _fetch_problem(fetcher: file_details.Fetcher) -> str:
+    if not fetcher.errors:
+        return ""
+    error = next(iter(fetcher.errors.values()))
+    return f", stopped after {type(error).__name__}: {error}" + (" (rate limited)" if fetcher.blocked else "")
+
+def _refresh_listing(home: Optional[xbmcgui.Window], job: Dict[str, Any], monitor: xbmc.Monitor) -> None:
+    """Container.Refresh once the listing of the job is shown and no dialog is open over it; nothing when
+    a newer listing took over, the user went elsewhere or REFRESH_WINDOW passed."""
+    try:
+        end = float(job.get("time") or 0) + REFRESH_WINDOW
+    except (TypeError, ValueError):
+        return
+    while time.time() < end:
+        if _json_property(home, ENRICH_PROPERTY).get("token") != job.get("token"):
+            return
+        if (_listing_key(xbmc.getInfoLabel("Container.FolderPath")) == job.get("key")
+                and not xbmc.getCondVisibility("System.HasActiveModalDialog")):
+            home.setProperty(REFRESH_PROPERTY, json.dumps({"key": job["key"], "time": time.time()}, separators=(",", ":")))
+            xbmc.executebuiltin("Container.Refresh")
+            return
+        if monitor.waitForAbort(0.25):
+            return
 
 def get_api() -> WebshareAPI:
     """Returns the Webshare client of this plugin call. Searching needs no login, see login_api()."""
@@ -393,32 +656,38 @@ def list_search_results(
     offset: int = 0,
     replace: bool = False,
     match: Optional[Dict[str, Any]] = None,
+    cached: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Displays one page of search results for a list of search terms using WebshareAPI.
     The same file found by more terms is shown once, the download link is resolved on playback.
     match: TMDb metadata (see matching.py) – in the best match order the results are sorted
-    by the match score like in the TMDb Helper flow.
+    by the match score like in the TMDb Helper flow; its "runtime" (minutes) checks the file lengths.
+    cached: the search answers of this listing kept for its one refresh after the file details arrived.
     """
     if sort is None or not 0 <= sort < len(SORT_VALUES):
         sort = default_sort()
     offset = max(0, offset)
 
     try:
-        api = get_api()
         seen = set()
         rows = []
         pages = []
+        answers = []
         has_more = False
         next_offset = offset + PAGE_SIZE
-        # Parallel requests, the responses keep the order of the terms (rank_files depends on it)
-        responses = api.search_all(search_terms, limit=PAGE_SIZE, offset=offset, sort=SORT_VALUES[sort])
+        if cached is not None:
+            responses = [{"response": response} for response in cached]
+        else:
+            # Parallel requests, the responses keep the order of the terms (rank_files depends on it)
+            responses = get_api().search_all(search_terms, limit=PAGE_SIZE, offset=offset, sort=SORT_VALUES[sort])
         for response in responses:
             if isinstance(response, Exception):
                 raise response
             response = response["response"]
             files = _as_list(response.get("file"))
             pages.append(files)
+            answers.append({"total": response.get("total", 0), "file": files})
             # "total" is unreliable for small result sets, trust it only after a full page
             if len(files) == PAGE_SIZE and int(response.get("total", 0)) > next_offset:
                 has_more = True
@@ -456,6 +725,14 @@ def list_search_results(
         url = get_url(action="choose_sort", query=str(search_terms), sort=sort, **_match_params(match))
         xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=False)
 
+        # file_info details known from earlier (cache); the missing ones are fetched after the listing is shown
+        cache = _details_cache()
+        details = {file_info["ident"]: cache.get(file_info["ident"]) for file_info in rows}
+        runtime = file_details.runtime_minutes((match or {}).get("runtime"))
+        mediatype = (match or {}).get("mediatype") or "movie"
+        pages = [[_with_details(file_info, details.get(file_info.get("ident"))) for file_info in files] for files in pages]
+        rows = [_with_details(file_info, details[file_info["ident"]]) for file_info in rows]
+
         preference = language_preference()
         if match and sort == 0:
             # Webshare ORs the query words: noise sharing one word with the first query comes before
@@ -467,6 +744,9 @@ def list_search_results(
             if preference:
                 # Preferred dub/subtitles first, otherwise keep the Webshare order (stable sort)
                 sources.sort(key=lambda pair: not matches_language_preference(pair[1], preference))
+        # The order stays: moving files with a wrong length down made the benchmark worse (false alarms)
+        for file_info, source in sources:
+            _apply_details(source, details.get(file_info["ident"]), runtime, mediatype)
 
         for file_info, source in sources:
             item = xbmcgui.ListItem(
@@ -479,6 +759,7 @@ def list_search_results(
                 "plot": _source_plot(source, _has_preview(file_info)),
                 "mediatype": "video",
             })
+            _set_stream_details(item, source)
             item.setArt(_resolution_badge_art(source, file_info.get("img", "")))
             xbmc.log(
                 f"[KodiSimpleStream] normalized Webshare source quality={source['quality_label']} "
@@ -502,6 +783,10 @@ def list_search_results(
         xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_LABEL)
         xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_SIZE)
         xbmcplugin.setContent(_handle, "videos")
+        top = [file_info["ident"] for file_info, _ in sources[:file_details.LIST_COUNT]]
+        _start_details([ident for ident in top if not cache.known(ident)], top,
+                       {"key": _current_listing_key(), "terms": search_terms, "sort": sort, "offset": offset,
+                        "match": match, "responses": answers})
         # replace: a new order of the same search takes the place of the old one in history
         xbmcplugin.endOfDirectory(_handle, updateListing=replace)
     except Exception as exc:
@@ -598,6 +883,8 @@ def handle_tmdb_selection(tmdb_id: str, search_type: str) -> None:
             "originaltitle": details.get("original_title") or "",
             "year": details.get("year") or "",
         }
+        if details.get("runtime"):
+            match["runtime"] = str(details["runtime"])  # minutes: checks the length of the found files
         list_search_results(build_search_queries(match), match=match)
         return
 
@@ -662,6 +949,8 @@ def list_episodes(
             "episode": ep_no,
             "episode_title": ep.get("title") or "",
         }
+        if ep.get("runtime"):
+            match["runtime"] = ep["runtime"]  # minutes: checks the length of the found files
         url = get_url(action="list_search_results", query=str(build_search_queries(match)), **_match_params(match))
         xbmcplugin.addDirectoryItem(_handle, url, xbmcgui.ListItem(label=label), isFolder=True)
 
@@ -776,16 +1065,7 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
         )
         return None
 
-    preference = language_preference()
-    sorted_items = sorted(
-        merged.values(),
-        key=lambda x: (
-            x["score"] + (LANG_PREF_BONUS if matches_language_preference(x["source"], preference) else 0),
-            x["quality_pref"],
-            x["size"],
-        ),
-        reverse=True,
-    )
+    sorted_items = sorted(merged.values(), key=_tmdbh_sort_key(language_preference()), reverse=True)
     debug_scores = _addon.getSettingBool("tmdbh_show_debug_scores")
     for it in sorted_items[:10]:
         if debug_scores:
@@ -794,6 +1074,71 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
                 xbmc.LOGINFO,
             )
     return sorted_items[:max_results]
+
+
+def _tmdbh_sort_key(preference: str):
+    """Match score with the language bonus, then the preferred quality and the size (best first, reverse sort)."""
+    return lambda x: (
+        x["score"] + (LANG_PREF_BONUS if matches_language_preference(x["source"], preference) else 0),
+        x["quality_pref"],
+        x["size"],
+    )
+
+
+def _fetch_tmdbh_details(results: List[Dict[str, Any]], count: int, deadline: float,
+                         cache: file_details.DetailsCache, fetcher: file_details.Fetcher) -> None:
+    """file_info of the first `count` results that the cache does not know, waiting `deadline` seconds at most.
+    fetcher: the one of this plugin call, so an ident in flight or failed after an earlier deadline is not
+    requested again and at most WORKERS requests run in total; its late answers are cached now.
+    Answers later than the deadline are left out (the rows show the name guesses); the requests still
+    running end by their timeout. Run before a dialog opens: the GUI stays on this thread."""
+    missing = [result["ident"] for result in results[:count] if not cache.known(result["ident"])]
+    if not missing or not _file_details_enabled():
+        return
+    began = time.monotonic()
+    home = _home()
+    if not file_details.blocked(home):
+        fetcher.request(missing, deadline)  # nothing after a failure, nothing requested twice
+    fetcher.wait(deadline, idents=missing)
+    fetcher.cancel_pending()
+    arrived = {ident: info for ident, info in fetcher.snapshot().items() if not cache.known(ident)}
+    found = _store_details(cache, fetcher, arrived, home) if arrived or fetcher.blocked else 0
+    xbmc.log(f"[KodiSimpleStream] file_info for TMDb Helper: {sum(1 for ident in missing if ident in arrived)}/"
+             f"{len(missing)} answers, {found} with details, {time.monotonic() - began:.2f} s{_fetch_problem(fetcher)}",
+             xbmc.LOGINFO)
+
+
+def _apply_tmdbh_details(results: List[Dict[str, Any]], params: Dict[str, Any], cache: file_details.DetailsCache) -> None:
+    """Known details on the sources (real resolution, length, audio) and the order again: a CZE track
+    counts for the Czech dub preference. Without details nothing changes."""
+    runtime = file_details.runtime_minutes(params.get("runtime"))
+    mediatype = (params.get("mediatype") or "movie").lower()
+    changed = False
+    for result in results:
+        info = cache.get(result["ident"])
+        if not info:
+            continue
+        plain = {key: value for key, value in result.items() if key not in ("source", "details")}
+        source = normalize_source(_with_details(plain, info))
+        source["score"] = result["score"]
+        result["source"] = _apply_details(source, info, runtime, mediatype)
+        result["details"] = info
+        changed = True
+    if changed:
+        results.sort(key=_tmdbh_sort_key(language_preference()), reverse=True)  # stable
+
+
+def _autoplay_rejection(result: Dict[str, Any], params: Dict[str, Any]) -> str:
+    """Why the auto-play must not take this file: a trailer/sample, a part, another year (matching.autoplay_concern)
+    or a length far off the runtime; "" when it may be played. An unknown length is no reason (12 % of files
+    are not analysed, file_info may be late), a known runtime is needed for the length check."""
+    concern = autoplay_concern(result, params)
+    if concern:
+        return concern
+    runtime = file_details.runtime_minutes(params.get("runtime"))
+    if file_details.length_mismatch(result.get("details"), runtime, params.get("mediatype") or "movie"):
+        return "length"
+    return ""
 
 
 def play_ident(ident: str) -> None:
@@ -846,7 +1191,8 @@ def _tmdbh_source_label(result: Dict[str, Any]) -> str:
 def _tmdbh_source_listitem(result: Dict[str, Any]) -> xbmcgui.ListItem:
     source = _tmdbh_source(result)
     item = xbmcgui.ListItem(
-        label=_source_label(source, result.get("img", "")),
+        # The select dialog shows label2 under every row and it starts with the quality: no [FHD] tag here
+        label=_source_label(source, result.get("img", ""), quality_tag=False),
         label2=metadata_line(source, include_score=True, include_quality=True),
     )
     item.setInfo("video", {
@@ -855,6 +1201,7 @@ def _tmdbh_source_listitem(result: Dict[str, Any]) -> xbmcgui.ListItem:
         "plot": _source_plot(source),
         "mediatype": "video",
     })
+    _set_stream_details(item, source)
     item.setArt(_resolution_badge_art(source, result.get("img", "")))
     return item
 
@@ -887,11 +1234,18 @@ def prompt_change_search(current_query: str) -> Optional[str]:
     return new_query
 
 
-def select_tmdbh_source(params: Dict[str, Any], results: Optional[List[Dict[str, Any]]] = None) -> None:
+def select_tmdbh_source(params: Dict[str, Any], results: Optional[List[Dict[str, Any]]] = None,
+                        cache: Optional[file_details.DetailsCache] = None,
+                        fetcher: Optional[file_details.Fetcher] = None) -> None:
     """Shows a modal source picker for TMDb Helper and resolves the selected item.
-    results: already found sources for the primary queries (play_best_tmdbh_source), searched again only for a new query."""
+    results: already found sources for the primary queries (play_best_tmdbh_source), searched again only for a new query.
+    The top rows get their file_info details before the dialog opens (PICKER_DEADLINE at most); cache and
+    fetcher: those of the auto-play check, one fetcher for the whole plugin call."""
     current_query = _primary_tmdbh_query(params)
     active_query: Optional[str] = None
+    cache = cache or _details_cache()
+    if fetcher is None:
+        fetcher = file_details.Fetcher([], 0)
 
     while True:
         if results is None:
@@ -899,6 +1253,11 @@ def select_tmdbh_source(params: Dict[str, Any], results: Optional[List[Dict[str,
             if results is None:
                 xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
                 return
+        if results:
+            # One constant for all devices: the wait ends as soon as all answers are in (about 0.3 s on a PC),
+            # the deadline only caps slow ones (TV boxes with a slow TLS handshake)
+            _fetch_tmdbh_details(results, file_details.PICKER_COUNT, file_details.PICKER_DEADLINE, cache, fetcher)
+            _apply_tmdbh_details(results, params, cache)
         if not results:
             xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
             new_query = prompt_change_search(current_query)
@@ -947,6 +1306,8 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
         xbmcplugin.endOfDirectory(_handle)
         return
 
+    # Not reachable from the router (TMDb Helper uses tmdbh_play): only the cached details, no fetching
+    _apply_tmdbh_details(results, params, _details_cache())
     for result in results:
         source = result.get("source") or normalize_source(result)
         item = xbmcgui.ListItem(
@@ -955,6 +1316,7 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
         )
         item.setInfo("video", {"title": source["title"], "size": result["size"], "mediatype": "video",
                                "plot": _source_plot(source, _has_preview(result))})
+        _set_stream_details(item, source)
         item.setArt(_resolution_badge_art(source, result.get("img", "")))
         item.setProperty("IsPlayable", "true")
         _add_preview_menu(item, result, source_title_label(source))
@@ -976,14 +1338,38 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
 
     min_score = int(_addon.getSetting("tmdbh_auto_play_min_score") or "80")
     best = results[0]
-    if best["score"] >= min_score:
-        xbmc.log(f"[KodiSimpleStream] Autoplaying best source score={best['score']} name={best['name']}", xbmc.LOGINFO)
-        play_ident(best["ident"])
+    cache = _details_cache()
+    fetcher = file_details.Fetcher([], 0)  # one for the check and the picker after it
+    if best["score"] < min_score:
+        xbmc.log(f"[KodiSimpleStream] Best score {best['score']} below threshold {min_score}, showing source picker", xbmc.LOGINFO)
+        # The picker shows the same sources, no second search
+        select_tmdbh_source(params, results, cache, fetcher)
         return
 
-    xbmc.log(f"[KodiSimpleStream] Best score {best['score']} below threshold {min_score}, showing source picker", xbmc.LOGINFO)
-    # The picker shows the same sources, no second search
-    select_tmdbh_source(params, results)
+    # Details only when they can change the choice: the length check needs the runtime (TMDb Helper does
+    # not pass one, see docs/tmdbhelper), a CZE track the Czech dub preference
+    if file_details.runtime_minutes(params.get("runtime")) or language_preference() == "cz_audio":
+        _fetch_tmdbh_details(results, file_details.AUTOPLAY_COUNT, file_details.AUTOPLAY_DEADLINE, cache, fetcher)
+    _apply_tmdbh_details(results, params, cache)
+    # The first of the best candidates above the threshold that is not a trailer, a part, another year
+    # or of a wrong length; none -> the picker, never a doubtful file
+    for candidate in results[:file_details.AUTOPLAY_COUNT]:
+        if candidate["score"] < min_score:
+            continue
+        rejection = _autoplay_rejection(candidate, params)
+        if not rejection:
+            xbmc.log(f"[KodiSimpleStream] Autoplaying source score={candidate['score']} name={candidate['name']}", xbmc.LOGINFO)
+            play_ident(candidate["ident"])
+            return
+        xbmc.log(f"[KodiSimpleStream] Autoplay skips ({rejection}) score={candidate['score']} name={candidate['name']}", xbmc.LOGINFO)
+
+    xbmcgui.Dialog().notification(
+        _addon.getAddonInfo("name"),
+        _addon.getLocalizedString(30074),  # "The best sources do not fit, choose one"
+        xbmcgui.NOTIFICATION_INFO,
+        3000,
+    )
+    select_tmdbh_source(params, results, cache, fetcher)
 
 
 def tmdbh_play(params: Dict[str, Any]) -> None:
@@ -1052,12 +1438,24 @@ def _int_param(params: Dict[str, str], name: str) -> Optional[int]:
 
 def router(paramstring: str) -> None:
     """Dispatches actions based on plugin paramstring."""
+    global _refresh_pass
     params = dict(parse_qsl(paramstring))
     action = params.get("action")
 
     if action is None:
         list_categories()
         return
+
+    if action in _LISTING_ACTIONS:
+        # The one refresh after the file details arrived: same search answers, no new details job
+        _refresh_pass, listing = _take_refresh_marker()
+        if listing.get("terms") and isinstance(listing.get("responses"), list):
+            # replace=False: the first listing already replaced the history entry; Kodi pops the
+            # parent path again on every fetch with updateListing (GUIMediaWindow::GetDirectory)
+            list_search_results([str(term) for term in listing["terms"]], _int_param(listing, "sort"),
+                                _int_param(listing, "offset") or 0, False,
+                                match=_parse_match(json.dumps(listing.get("match"))), cached=listing["responses"])
+            return
 
     if action == "listing":
         list_videos(params["category"])
@@ -1095,6 +1493,8 @@ def router(paramstring: str) -> None:
             params.get("replace") == "1",
             match=_parse_match(params.get("match")),
         )
+    elif action == "file_details":
+        fetch_details(params.get("token", ""))
     elif action == "choose_sort":
         choose_sort(_parse_query(params["query"]), _int_param(params, "sort") or 0, match=_parse_match(params.get("match")))
     else:

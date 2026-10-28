@@ -744,6 +744,35 @@ def score_episode_result(file_info: Dict[str, Any], params: Dict[str, Any]) -> i
     return int(round(score))
 
 
+_DISC_PART = re.compile(r"(?<![a-z0-9])(?:cd|disc|disk)\s?[1-9](?![0-9])|(?<![a-z0-9])[1-9]\s?(?:of|z)\s?[2-9](?![0-9a-z])")
+
+
+def autoplay_concern(file_info: Dict[str, Any], params: Dict[str, Any]) -> str:
+    """Why a file should not be played without asking: "extra" (trailer, sample, making of …), "part"
+    (CD1, disc 2, 1of2 of a film) or "year" (a film year far from the wanted one: a remake or another film);
+    "" when the name gives no reason. Scoring is not affected."""
+    name = str(file_info.get("name") or "")
+    episode = str(params.get("mediatype") or "").lower() == "episode"
+    if episode:
+        titles = _title_variants((_first_non_empty(params, SHOW_KEYS), _first_non_empty(params, SHOW_ORIGINAL_KEYS),
+                                  _first_non_empty(params, SHOW_ENGLISH_KEYS)), False)
+    else:
+        titles = _title_variants((_first_non_empty(params, MOVIE_TITLE_KEYS), _first_non_empty(params, MOVIE_ORIGINAL_KEYS),
+                                  _first_non_empty(params, MOVIE_ENGLISH_KEYS)), True)
+    vocabulary = _vocabulary(titles)
+    if _has_bad_tokens(name, vocabulary):
+        return "extra"
+    if episode:
+        return ""
+    if _DISC_PART.search(_separators(fold_text(_EXTENSION.sub("", name)))):
+        return "part"
+    year = _as_int(str(params.get("year") or "")[:4])
+    years = _file_name(name).years(ignore={t for t in vocabulary if _YEAR.match(t)})
+    if year and years and all(abs(year - other) > 1 for other in years):
+        return "year"
+    return ""
+
+
 def rank_files(results_per_query: Sequence[Sequence[Dict[str, Any]]], match: Dict[str, Any],
                preference: str = "") -> List[Dict[str, Any]]:
     """Files of all queries (the first occurrence of an ident counts) sorted by the match score, equal scores

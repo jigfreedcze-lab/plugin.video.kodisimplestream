@@ -248,13 +248,23 @@ def parse_file_info(data: bytes) -> Optional[Dict[str, Any]]:
     return info
 
 
-def fetch_file_info(ident: str) -> Optional[Dict[str, Any]]:
-    """Anonymous file_info request (no token): POST with the ident only, size and time capped."""
-    deadline = time.monotonic() + FILE_INFO_WAIT
-    with _http().post(FILE_INFO_URL, data={"ident": ident}, timeout=FILE_INFO_TIMEOUT,
+class FileInfoStatusError(ValueError):
+    """file_info answered with an HTTP error status (403: Webshare limits the request rate)."""
+
+    def __init__(self, status: int):
+        super().__init__(f"file_info HTTP {status}")
+        self.status = status
+
+
+def fetch_file_info(ident: str, timeout: Tuple[float, float] = FILE_INFO_TIMEOUT,
+                    wait: float = FILE_INFO_WAIT) -> Optional[Dict[str, Any]]:
+    """Anonymous file_info request (no token): POST with the ident only, size and time capped
+    (timeout: requests (connect, read), wait: the whole response)."""
+    deadline = time.monotonic() + wait
+    with _http().post(FILE_INFO_URL, data={"ident": ident}, timeout=timeout,
                        stream=True, allow_redirects=False) as response:
         if response.status_code != 200:
-            raise ValueError(f"file_info HTTP {response.status_code}")
+            raise FileInfoStatusError(response.status_code)
         data = b""
         for chunk in response.iter_content(16 * 1024):
             data += chunk

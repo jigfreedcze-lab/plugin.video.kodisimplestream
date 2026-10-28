@@ -255,3 +255,15 @@ msgstr "Changes the order of the search results"
 msgctxt "#30072"
 msgid "Shows the next {} results"
 msgstr "Shows the next {} results"
+
+msgctxt "#30073"
+msgid "Length does not match the runtime on TMDb ({} min)"
+msgstr "Length does not match the runtime on TMDb ({} min)"
+
+msgctxt "#30074"
+msgid "The best sources do not fit, choose one"
+msgstr "The best sources do not fit, choose one"
+
+msgctxt "#30075"
+msgid "Load file details from Webshare (resolution, length, audio)"
+msgstr "Load file details from Webshare (resolution, length, audio)"

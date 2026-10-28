@@ -82,6 +82,19 @@ This product uses TMDB and the TMDB APIs but is not endorsed, certified, or othe
 2. Použijte vyhledávací funkci pro nalezení videí (hodně možností že?)
 3. Vyberte video pro spuštění přehrávání
 
+#### Skutečné parametry souborů
+Seznam výsledků se zobrazí hned. U prvních 15 souborů si pak doplněk na pozadí (anonymně, bez přihlášení) zjistí
+z Webshare skutečnou délku, rozlišení a zvukové stopy a seznam jednou obnoví:
+- délka je vedle názvu; **oranžová s vykřičníkem**, když neodpovídá stopáži z TMDb (film mimo 0,8–1,5×,
+  epizoda pod 0,45× nebo nad 1,5×) – nejspíš jiný film, epizoda, trailer nebo jen část (CD1). Pořadí se nemění.
+- štítek kvality ukazuje skutečné rozlišení místo odhadu z názvu, popis (Informace) skutečné video, datový tok a stopy,
+  skin zobrazí ikony kodeků a kanálů.
+- česká zvuková stopa (CZE) se počítá jako CZ dabing – štítek i preference jazyka, i když v názvu není.
+  Chybějící stopa CZE nic neznamená (mp4/avi mívají jedinou stopu označenou ENG nebo UND).
+
+Údaje se pamatují 14 dní (nejvýše 2000 souborů, `addon_data/plugin.video.kodisimplestream/file_details.json`).
+Když Webshare neodpoví, seznam zůstane jen s údaji z názvu souboru.
+
 ### Požadavky
 - Kodi 19.0 (Matrix) nebo novější (testoval jsem jen na Kodi 21)
 - Aktivní účet na Webshare.cz
@@ -101,6 +114,11 @@ Nápady na vylepšení i opravy jsou vítány – založte Issue nebo rovnou po�
 3. TMDb Helper pak při kliknutí na film/epizodu zavolá trasu:
    `plugin://plugin.video.kodisimplestream/?action=tmdbh_play...`
 4. Addon vyhledá Webshare zdroje a při vypnutém auto-play zobrazí modální výběr zdroje přímo v TMDb Helper přehrávacím toku. Po výběru se zdroj vyřeší přes `play_ident`.
+   Před otevřením výběru zjistí skutečné parametry prvních 10 zdrojů (nejvýše 1,2 s, co nedorazí, je bez nich).
+
+Auto-play přehraje první z 5 nejlepších zdrojů nad prahem skóre, který není trailer/ukázka, část (CD1, 1of2)
+ani film z jiného roku; jinak otevře výběr zdroje. Délku proti stopáži kontrolovat nemůže: TMDb Helper přehrávači
+stopáž nepředává (v řetězci přehrávače není žádná proměnná s délkou), takže v tomto toku jsou jen rozlišení a zvukové stopy.
 
 Nová nastavení addonu (sekce **TMDb Helper**):
 - **Auto-play best source** – automaticky přehraje nejlépe skórovaný zdroj.

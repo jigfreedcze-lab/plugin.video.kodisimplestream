@@ -390,12 +390,27 @@ def metadata_parts(source: Dict[str, Any], include_score: bool = False) -> List[
     return parts
 
 
+# Orange (AARRGGBB) of a length far off the TMDb runtime
+WARNING_COLOR = "FFFF8C00"
+
+
+def length_part(source: Dict[str, Any]) -> str:
+    """The real length from file_info ("1:58:00"), orange with "!" when it does not match the TMDb runtime
+    (probably another film, an episode, a trailer or a part); "" when it is not known."""
+    length = source.get("length_text") or ""
+    if length and source.get("length_mismatch"):
+        return f"[COLOR {WARNING_COLOR}]{length} ![/COLOR]"
+    return length
+
+
 def metadata_line(source: Dict[str, Any], include_score: bool = False, include_quality: bool = False) -> str:
     parts: List[str] = []
     if include_quality:
         quality = source.get("quality_label") or "SD"
         resolution = source.get("resolution_label") or "SD"
         parts.append(f"{quality} {resolution}")
+    if length_part(source):
+        parts.append(length_part(source))
     parts.extend(metadata_parts(source, include_score))
     return " | ".join(parts)
 
@@ -414,7 +429,7 @@ def source_heading(source: Dict[str, Any], max_title: int = 42, include_score: b
 def compact_label(source: Dict[str, Any], include_score: bool = True, max_title: int = 42) -> str:
     """One-line fallback label for skins/Kodi builds without detailed select rows."""
     label = source_heading(source, max_title=max_title, include_score=False)
-    parts = metadata_parts(source, include_score=False)[:4]
+    parts = ([length_part(source)] if length_part(source) else []) + metadata_parts(source, include_score=False)[:4]
     if parts:
         label += "  •  " + " • ".join(parts)
     if include_score and source.get("score") is not None:

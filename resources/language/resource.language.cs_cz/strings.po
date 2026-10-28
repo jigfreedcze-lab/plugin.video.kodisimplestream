@@ -255,3 +255,15 @@ msgstr "Změní řazení výsledků hledání"
 msgctxt "#30072"
 msgid "Shows the next {} results"
 msgstr "Zobrazí dalších {} výsledků"
+
+msgctxt "#30073"
+msgid "Length does not match the runtime on TMDb ({} min)"
+msgstr "Délka neodpovídá stopáži na TMDb ({} min)"
+
+msgctxt "#30074"
+msgid "The best sources do not fit, choose one"
+msgstr "Nejlepší zdroje nesedí, vyberte ručně"
+
+msgctxt "#30075"
+msgid "Load file details from Webshare (resolution, length, audio)"
+msgstr "Načítat údaje o souborech z Webshare (rozlišení, délka, zvuk)"

@@ -68,3 +68,13 @@ try: t.search("x"); raise SystemExit("401 nevyhodilo TMDBAuthError")
 except TMDBAuthError: pass
 requests.get = real_get
 print("2. kolo: dalších 8 kontrol prošlo")
+
+# --- 3. kolo: stopáž (minuty) pro kontrolu délky nalezených souborů, bez dalšího dotazu ---
+FAKE["movie/129"]["runtime"] = 125
+FAKE["tv/1396/season/1"]["episodes"][0]["runtime"] = 47
+n = len(calls)
+assert t.get_detail("movie:129")["runtime"] == 125 and t.get_detail("movie:672")["runtime"] is None
+assert t.get_detail("tv:1396")["runtime"] is None, "seriál: stopáž mají až epizody"
+e = t.get_episodes("tv:1396", "1"); assert {x["number"]: x["runtime"] for x in e} == {1: None, 2: 47}, e
+assert len(calls) == n + 4
+print("3. kolo: stopáž OK")

@@ -4,6 +4,7 @@ the window and its 1:1 layout (stubbed Kodi modules). Names and idents are synth
 Run from the repository root: python tests/test_preview.py
 """
 import io
+import json
 import os
 import shutil
 import sys
@@ -480,6 +481,8 @@ k.show_preview("INFO1", "https://img.webshare.cz/s.jpg", 10, "Film.mkv", "100")
 assert posts == [(preview.FILE_INFO_URL, {"ident": "INFO1"})], posts
 assert windows == [(["/tmp/0.jpg"], "Film.mkv", BACKGROUND, ROWS_A)] and log == [], (windows, log)
 assert builtins == ["ActivateWindow(busydialognocancel)", "Dialog.Close(busydialognocancel)"], builtins
+# the lists show the details of a previewed file too (session cache of the file details)
+assert json.loads(home_props[k.file_details.SESSION_PROPERTY])["INFO1"]["info"]["width"] == "1920", home_props
 # no title in the URL: the name from file_info
 windows.clear(); k.show_preview("INFO1", "https://img.webshare.cz/s.jpg", 10, "", "")
 assert windows[0][1] == "Synthetic.Film.2001.1080p.mkv" and len(posts) == 1, (windows, posts)  # cached: no second request

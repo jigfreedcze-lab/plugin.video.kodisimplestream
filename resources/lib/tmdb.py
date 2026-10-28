@@ -110,6 +110,9 @@ class TMDB:
             if english and english != title and not original_title:
                 original_title = english
             details['title'], details['original_title'] = title, original_title
+        # Minutes, for the length check of the found files (movie/{id} has it already, no extra request);
+        # series give their usual episode length only, the episodes have their own (get_episodes)
+        details['runtime'] = data.get("runtime") if kind == "movie" else None
         return details
 
     def get_seasons(self, full_id: str) -> List[Dict]:
@@ -141,6 +144,7 @@ class TMDB:
                 'title': episode.get("name") or "",
                 'season': episode.get("season_number"),
                 'number': episode.get("episode_number"),
+                'runtime': episode.get("runtime"),  # minutes, None when TMDb does not know it
             })
         episodes.sort(key=lambda x: x['number'] or 0)
         return episodes

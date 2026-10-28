@@ -337,7 +337,7 @@ print("náhledy: OK")
 
 # 16. Výběr zdroje TMDb Helperu má stejný náhled a popisek
 li = k._tmdbh_source_listitem({"ident": "P", "name": "Film.2020.1080p.CZ.Dabing.mkv", "img": "https://img/P-S.jpg", "size": 100, "score": 90})
-assert li.art["thumb"] == li.art["landscape"] == "https://img/P-S.jpg" and li.label.startswith("[FHD] [CZ dabing] "), (li.art, li.label)
+assert li.art["thumb"] == li.art["landscape"] == "https://img/P-S.jpg" and li.label.startswith("[CZ dabing] ") and li.label2.startswith("FHD "), (li.art, li.label)  # kvalita jen v label2
 li = k._tmdbh_source_listitem({"ident": "N", "name": "Film.2020.mkv", "img": None, "size": 100, "score": 50})
 assert li.art["thumb"].endswith("sd.png") and not li.label.startswith("["), (li.art, li.label)
 print("náhledy TMDb Helper: OK")
