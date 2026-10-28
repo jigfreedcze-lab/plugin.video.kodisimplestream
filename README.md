@@ -96,8 +96,9 @@ z Webshare skutečnou délku, rozlišení a zvukové stopy a seznam jednou obnov
 Když Webshare neodpoví, seznam zůstane jen s údaji z názvu souboru.
 
 ### Požadavky
-- Kodi 19.0 (Matrix) nebo novější (testoval jsem jen na Kodi 21)
+- Kodi 19.0 (Matrix) nebo novější (testováno jen na Kodi 21.3, Windows a Android TV)
 - Aktivní účet na Webshare.cz
+- Volitelně [TMDb Helper](#tmdb-helper-integrace): otestováno s verzí **5.4.16** z oficiálního repozitáře Kodi. Řada 6.x z repozitáře autora TMDb Helperu zatím vyzkoušená není.
 
 ### Podpora
 Pokud narazíte na problémy nebo máte otázky:
