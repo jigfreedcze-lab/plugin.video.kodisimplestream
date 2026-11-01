@@ -1688,6 +1688,9 @@ def _add_english_title(params: Dict[str, Any]) -> None:
 def tmdbh_play(params: Dict[str, Any]) -> None:
     # TMDb Helper fills keys it does not know with "_"
     params = {key: value for key, value in params.items() if value != "_"}
+    # The second player (docs/tmdbhelper/kodisimplestream_select.json) always opens the source picker,
+    # only the exact value turns it on
+    force_picker = params.pop("select", None) == "1"
     queries = build_tmdbh_queries(params)
     if not queries:
         xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "Missing required metadata for TMDb Helper search", xbmcgui.NOTIFICATION_ERROR, 4000)
@@ -1700,7 +1703,10 @@ def tmdbh_play(params: Dict[str, Any]) -> None:
         return
 
     _add_english_title(params)
-    if _addon.getSettingBool("tmdbh_auto_play_best"):
+    if force_picker:
+        xbmc.log("[KodiSimpleStream] TMDbH source picker requested, auto-play skipped", xbmc.LOGINFO)
+        select_tmdbh_source(params)
+    elif _addon.getSettingBool("tmdbh_auto_play_best"):
         play_best_tmdbh_source(params)
     else:
         select_tmdbh_source(params)

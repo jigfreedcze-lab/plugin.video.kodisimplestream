@@ -118,10 +118,16 @@ Pokud narazíte na problémy nebo máte otázky:
 Nápady na vylepšení i opravy jsou vítány – založte Issue nebo rovnou pošlete Pull request.
 
 ### TMDb Helper integrace
-1. Zkopírujte soubor `docs/tmdbhelper/kodisimplestream.json` do:
-   `userdata/addon_data/plugin.video.themoviedb.helper/players/kodisimplestream.json`
+1. Zkopírujte oba soubory `docs/tmdbhelper/kodisimplestream.json` a `docs/tmdbhelper/kodisimplestream_select.json` do:
+   `userdata/addon_data/plugin.video.themoviedb.helper/players/`
    Pokud už tam starší soubor je, přepište jej novou verzí. Starší soubor posílal místo originálního názvu
    seriálu a TMDb id jen `_` (neexistující klíče `{show_originaltitle}`, `{tmdb_id}`, `{imdb_id}`).
+   - `kodisimplestream.json` (přehrávač **KodiSimpleStream**) je hlavní přehrávač: podle nastavení auto-play
+     zdroj přehraje sám, nebo otevře výběr zdroje.
+   - `kodisimplestream_select.json` (přehrávač **KodiSimpleStream – výběr zdroje**) otevře výběr zdroje vždy,
+     i se zapnutým auto-play. Hodí se, když auto-play vybere špatný soubor. V seznamu přehrávačů je hned
+     za hlavním; výchozí přehrávač TMDb Helperu je uložený podle názvu souboru (`kodisimplestream.json play_movie`),
+     druhý soubor ho tedy nezmění.
 2. V TMDb Helper otevřete nastavení přehrávačů a povolte/vyberte `KodiSimpleStream`.
 3. TMDb Helper pak při kliknutí na film/epizodu zavolá trasu:
    `plugin://plugin.video.kodisimplestream/?action=tmdbh_play...`
@@ -132,6 +138,12 @@ Auto-play přehraje první z 5 nejlepších zdrojů nad prahem skóre, který ne
 film z jiného roku ani soubor s datovým tokem nad limitem (viz **Auto-play maximum bitrate** níže); jinak otevře
 výběr zdroje. Délku proti stopáži kontrolovat nemůže: TMDb Helper přehrávači stopáž nepředává (v řetězci přehrávače
 není žádná proměnná s délkou), takže v tomto toku jsou jen rozlišení, zvukové stopy a datový tok.
+
+Jiný zdroj, než jaký vybere auto-play: v TMDb Helperu otevřete kontextovou nabídku filmu nebo epizody,
+zvolte **Select player** (TMDb Helper nemá český překlad, položka je anglicky) a v seznamu přehrávačů
+**Play with KodiSimpleStream – výběr zdroje**. Při zapnutém sloučení přehrávačů (nastavení TMDb Helperu
+*Combine all players for plugin into single entry*) nejdřív zvolte položku tohoto doplňku, **kodisimplestream** (název z `addon.xml`), a pak tento přehrávač. Otevře se stejný výběr zdroje
+jako při vypnutém auto-play (včetně minimálního skóre a změny hledání).
 
 Nová nastavení addonu (sekce **TMDb Helper**):
 - **Auto-play best source** – automaticky přehraje nejlépe skórovaný zdroj.

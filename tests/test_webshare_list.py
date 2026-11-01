@@ -536,3 +536,27 @@ inputs[:] = [""]; k.tmdbh_play({"mediatype": "movie", "title": "Zelený ostrov",
 assert api.batches[-1] == ["Zelený ostrov 2015", "Zelený ostrov"], api.batches[-1]
 k.TMDB = real_tmdb; Addon.settings.pop("tmdb_api_key")
 print("anglický název pro TMDb Helper: OK")
+
+# 24. Druhý přehrávač TMDb Helperu (kodisimplestream_select.json): select=1 otevře výběr zdroje i se zapnutým
+#     automatickým přehráním; bez něj se přehrává automaticky jako dřív, jiná hodnota výběr nevynutí
+api = FakeAPI({("Film 2020", 0): (2, [good, bad])}); k.get_api = lambda: api
+Addon.settings.update(tmdbh_auto_play_best="true", tmdbh_auto_play_min_score="1", tmdbh_picker_min_score="0")
+def tmdbh_events(params):
+    log.clear(); k.tmdbh_play(params)
+    return [e[0] for e in log if e[0] != "log"]
+assert tmdbh_events(tm) == ["resolved"] and log[-1] == ("resolved", True, "https://dl/x") and api.links[-1] == "G", log
+selects[:] = [2]; assert tmdbh_events(dict(tm, select="1")) == ["select", "resolved"], log
+picks = [e for e in log if e[0] == "select"]
+assert len(rows(picks[0])) == 3 and log[-1] == ("resolved", True, "https://dl/x") and api.links[-1] == "L", (rows(picks[0]), api.links)
+assert len(api.batches[-1]) == len(k.build_tmdbh_queries(tm)), "select se do hledání nedostane"
+for value in ("", "0", "2", "true", "yes", " 1", "1 ", "01", "_"):
+    assert tmdbh_events(dict(tm, select=value)) == ["resolved"] and api.links[-1] == "G", (value, log)
+# Bez přihlašovacích údajů se ani s výběrem nehledá a výběr se neotevře
+Addon.settings.update(username="", password=""); n = len(api.batches)
+events = tmdbh_events(dict(tm, select="1")); assert "select" not in events and log[-1][:2] == ("resolved", False) and len(api.batches) == n, log
+Addon.settings.update(username="u", password="p")
+# Automatické přehrávání vypnuté: výběr jako vždy
+Addon.settings["tmdbh_auto_play_best"] = ""
+selects[:] = [1]; assert tmdbh_events(dict(tm, select="1")) == ["select", "resolved"] and api.links[-1] == "G", log
+Addon.settings.update(tmdbh_auto_play_min_score="")
+print("přehrávač s výběrem zdroje: OK")

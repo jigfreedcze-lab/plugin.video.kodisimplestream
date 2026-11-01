@@ -1,0 +1,18 @@
+{
+  "name": "KodiSimpleStream – výběr zdroje",
+  "plugin": "plugin.video.kodisimplestream",
+  "priority": 501,
+  "is_resolvable": "true",
+  "assert": {
+    "play_movie": [
+      "title"
+    ],
+    "play_episode": [
+      "showname",
+      "season",
+      "episode"
+    ]
+  },
+  "play_movie": "plugin://plugin.video.kodisimplestream/?action=tmdbh_play&mediatype=movie&title={title}&originaltitle={originaltitle}&year={year}&imdb_id={imdb}&tmdb_id={tmdb}&select=1",
+  "play_episode": "plugin://plugin.video.kodisimplestream/?action=tmdbh_play&mediatype=episode&showname={showname}&tvshowtitle={tvshowtitle}&show_originaltitle={originaltitle}&season={season}&episode={episode}&episode_title={title}&aired={premiered}&year={year}&imdb_id={imdb}&tmdb_id={tmdb}&select=1"
+}

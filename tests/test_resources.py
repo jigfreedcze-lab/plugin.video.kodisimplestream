@@ -54,12 +54,29 @@ def test_tmdbhelper_player_uses_known_keys():
     """TMDb Helper fills unknown keys with "_" ({tmdb_id}, {show_originaltitle} do not exist, see
     tmdbhelper/lib/player/details.py set_detailed_item): only keys it sets."""
     import json, re
-    player = json.load(open(os.path.join(REPO, "docs", "tmdbhelper", "kodisimplestream.json"), encoding="utf-8"))
+    folder = os.path.join(REPO, "docs", "tmdbhelper")
+    players = {name: json.load(open(os.path.join(folder, name), encoding="utf-8"))
+               for name in sorted(os.listdir(folder)) if name.endswith(".json")}
+    assert set(players) == {"kodisimplestream.json", "kodisimplestream_select.json"}, sorted(players)
     known = {"title", "originaltitle", "year", "imdb", "tmdb", "showname", "tvshowtitle", "season", "episode", "premiered"}
-    for key in ("play_movie", "play_episode"):
-        used = set(re.findall(r"{(\w+)}", player[key]))
-        assert used <= known, (key, sorted(used - known))
-    assert "show_originaltitle={originaltitle}" in player["play_episode"] and "tmdb_id={tmdb}" in player["play_episode"]
+    for name, player in players.items():
+        for key in ("play_movie", "play_episode"):
+            used = set(re.findall(r"{(\w+)}", player[key]))
+            assert used <= known, (name, key, sorted(used - known))
+        assert "show_originaltitle={originaltitle}" in player["play_episode"] and "tmdb_id={tmdb}" in player["play_episode"], name
+    # The picker player: the main one plus &select=1, its own name and the next priority (TMDb Helper sorts
+    # by priority; the user's default player is bound to the file name kodisimplestream.json)
+    main, select = players["kodisimplestream.json"], players["kodisimplestream_select.json"]
+    assert set(main) == set(select), sorted(set(main) ^ set(select))
+    for key in main:
+        if key in ("play_movie", "play_episode"):
+            assert select[key] == main[key] + "&select=1", key
+        elif key == "name":
+            assert select[key] != main[key] and select[key].startswith(main[key]), select[key]
+        elif key == "priority":
+            assert select[key] == main[key] + 1, (main[key], select[key])
+        else:
+            assert select[key] == main[key], key
 
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
