@@ -279,3 +279,7 @@ msgstr "Show {} more sources below the minimum score"
 msgctxt "#30078"
 msgid "No source reaches the minimum score ({} hidden)"
 msgstr "No source reaches the minimum score ({} hidden)"
+
+msgctxt "#30079"
+msgid "Animated preview of the focused file (Wide list view)"
+msgstr "Animated preview of the focused file (Wide list view)"

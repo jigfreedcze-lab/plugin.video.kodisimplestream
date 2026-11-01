@@ -700,5 +700,36 @@ info_labels["System.ScreenWidth"], info_labels["System.ScreenHeight"] = "1920", 
 gui["size"] = (1920, 1080)
 groups += 1
 
+# 10. animated preview for the Wide list (issue #5): a GIF of the frames, 1 s each, endless, built once,
+#     no GIF for a single frame, wide frames scaled down, a new cut drops the old animation
+if Image:
+    serve(stripe_jpeg(10, 649, 365)); downloads.clear()
+    folder = os.path.join(TMP, "gif")
+    path = preview.make_gif("https://img.webshare.cz/g.jpg", 10, folder)
+    assert path == os.path.join(folder, preview.GIF_FILE) and preview.cached_gif(folder) == path, path
+    assert not [name for name in os.listdir(folder) if name.endswith(".part")]
+    with Image.open(path) as gif:
+        assert gif.format == "GIF" and gif.n_frames == 10 and gif.info.get("loop") == 0, (gif.n_frames, gif.info)
+        assert gif.info.get("duration") == 1000 and gif.width == preview.GIF_MAX_WIDTH, (gif.info, gif.size)
+        assert abs(gif.width / gif.height - 16 / 9) < 0.05, gif.size
+    assert preview.make_gif("https://img.webshare.cz/g.jpg", 10, folder) == path and len(downloads) == 1, "built once"
+    preview.split_stripe(stripe_jpeg(4), 4, folder); assert preview.cached_gif(folder) == "", "old animation dropped"
+    serve(stripe_jpeg(1)); single = os.path.join(TMP, "gif1")
+    assert preview.make_gif("https://img.webshare.cz/one.jpg", 1, single) == "" and not preview.cached_gif(single)
+    assert preview.animation_unavailable(single), "one frame: not asked again"
+    assert not [name for name in os.listdir(folder) if name.endswith(".part")], "no temporary file left"
+    broken = os.path.join(TMP, "gifbad"); os.makedirs(broken, exist_ok=True)
+    with open(os.path.join(broken, preview.GIF_FILE), "wb") as handle:
+        handle.write(b"<html>")
+    assert preview.cached_gif(broken) == "", "not a GIF: not used"
+    try:
+        preview.make_gif("http://evil.example/x.jpg", 10, os.path.join(TMP, "gif2")); raise AssertionError("foreign URL")
+    except ValueError:
+        pass
+    # Pillow 10 dropped Image.ADAPTIVE, Kodi for Windows has Pillow 6.2 without Image.Palette
+    assert preview._adaptive_palette(types.SimpleNamespace(ADAPTIVE=1)) == 1
+    assert preview._adaptive_palette(types.SimpleNamespace(Palette=types.SimpleNamespace(ADAPTIVE=2))) == 2
+groups += 1
+
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"video preview: {groups} groups of checks passed")

@@ -279,3 +279,7 @@ msgstr "Zobrazit další zdroje pod minimálním skóre ({})"
 msgctxt "#30078"
 msgid "No source reaches the minimum score ({} hidden)"
 msgstr "Žádný zdroj nedosahuje minimálního skóre (skryto: {})"
+
+msgctxt "#30079"
+msgid "Animated preview of the focused file (Wide list view)"
+msgstr "Animovaný náhled vybraného souboru (zobrazení Wide list)"

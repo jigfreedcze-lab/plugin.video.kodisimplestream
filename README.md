@@ -95,6 +95,16 @@ z Webshare skutečnou délku, rozlišení a zvukové stopy a seznam jednou obnov
 Údaje se pamatují 14 dní (nejvýše 2000 souborů, `addon_data/plugin.video.kodisimplestream/file_details.json`).
 Když Webshare neodpoví, seznam zůstane jen s údaji z názvu souboru.
 
+#### Animovaný náhled (zobrazení Wide list)
+Ve stejném běhu na pozadí doplněk složí z náhledového pásu prvních 10 souborů animovaný GIF (snímek za sekundu,
+dokola) a seznam jednou obnoví. Ve zobrazení **Wide list** (skin Estuary) pak hraje jen velký panel vybraného
+souboru, řádky zůstanou statické. Kodi animuje každý viditelný GIF, proto je animace jen v obrázku `poster`:
+v zobrazení **Icon wall** by se hýbaly všechny dlaždice. Výběr zdroje TMDb Helperu ukazuje jen ikonu, animace v něm není.
+Seznamy dál mají typ obsahu `videos` (typ `movies` by přidal zobrazení, kde se hýbe všechno, a Kodi by soubory
+považovalo za filmy). GIFy leží v `special://temp` (Kodi ho maže při startu), jeden má asi 0,4 MB.
+Když se cokoli nepovede, zůstane statický náhled. Vypíná se v nastavení **Hledání → Animovaný náhled vybraného souboru**
+(jen se zapnutým náhledem videa místo odznaku kvality). Na Android TV zatím nevyzkoušeno (výkon a paměť).
+
 ### Požadavky
 - Kodi 19.0 (Matrix) nebo novější (testováno jen na Kodi 21.3, Windows a Android TV)
 - Aktivní účet na Webshare.cz

@@ -161,12 +161,16 @@ def split_stripe(data: bytes, count: int, folder: str) -> List[str]:
     frame_w, frame_h = max(1, width - width % 2), max(1, strip.height - strip.height % 2)
     os.makedirs(folder, exist_ok=True)
     count_file = os.path.join(folder, _COUNT_FILE)
-    if os.path.exists(count_file):
-        os.remove(count_file)  # the old set is invalid until all new frames are written
-    # Frames of an earlier set (another count, an interrupted cut) would stay behind for good
-    for name in os.listdir(folder):
-        if name.endswith(".jpg"):
-            os.remove(os.path.join(folder, name))
+    # The old set is invalid until all new frames are written. Frames of an earlier set (another count, an
+    # interrupted cut) would stay behind for good, the animation is made of them too. Another script may cut
+    # the same stripe at the same time (the preview window and the animations of the list): a file it has
+    # removed already is fine.
+    for name in [_COUNT_FILE] + os.listdir(folder):
+        if name == _COUNT_FILE or name.endswith((".jpg", ".part")) or name in (GIF_FILE, GIF_NONE):
+            try:
+                os.remove(os.path.join(folder, name))
+            except FileNotFoundError:
+                pass
     paths = _frame_paths(folder, count)
     for index, path in enumerate(paths):
         strip.crop((index * width, 0, index * width + frame_w, frame_h)).save(path, quality=90)
@@ -175,7 +179,7 @@ def split_stripe(data: bytes, count: int, folder: str) -> List[str]:
     return paths
 
 
-def load_frames(stripe_url: str, count: int, folder: str) -> List[str]:
+def load_frames(stripe_url: str, count: int, folder: str, timeout: Tuple[float, float] = DOWNLOAD_TIMEOUT) -> List[str]:
     """Frames from the cache folder, or downloaded and cut on the first request."""
     if not is_stripe_url(stripe_url):
         raise ValueError(f"not a http(s) stripe URL: {stripe_url!r}")
@@ -190,7 +194,90 @@ def load_frames(stripe_url: str, count: int, folder: str) -> List[str]:
     import PIL.Image  # noqa: F401
 
     prune_cache(os.path.dirname(folder), os.path.basename(folder), MAX_CACHED)
-    return split_stripe(_download(stripe_url), count, folder)
+    return split_stripe(_download(stripe_url, timeout), count, folder)
+
+
+# --- Animated preview for the Wide list (issue #5) ---
+# Kodi animates every GIF it draws; in the Wide list only the poster of the focused row is a GIF, the rows
+# keep the static image. One file per ident folder, written under another name first: Kodi never reads
+# a half-written GIF.
+GIF_FILE = "anim.gif"
+GIF_MAX_WIDTH = 480
+GIF_FRAME_MS = 1000  # as the frames of the preview window (FRAME_SECONDS)
+GIF_NONE = "anim.none"  # marker: no animation for this file (one frame, a failed download) until Kodi restarts
+GIF_TIMEOUT = (3.05, 4)  # the stripe download of the background script, which has a time budget
+
+
+def cached_gif(folder: str) -> str:
+    """Path of the animated preview built earlier, "" when there is none (or the file is not a GIF)."""
+    path = os.path.join(folder, GIF_FILE)
+    try:
+        with open(path, "rb") as handle:
+            return path if handle.read(6) in (b"GIF87a", b"GIF89a") else ""
+    except OSError:
+        return ""
+
+
+def animation_unavailable(folder: str) -> bool:
+    """An earlier try found no animation for the file: the list does not ask again."""
+    return os.path.isfile(os.path.join(folder, GIF_NONE))
+
+
+def mark_unavailable(folder: str) -> None:
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, GIF_NONE), "w", encoding="utf-8"):
+            pass
+    except OSError:
+        pass
+
+
+def _adaptive_palette(image_module: Any) -> Any:
+    # Image.ADAPTIVE moved to Image.Palette.ADAPTIVE (Pillow 9.1) and the old name went away in Pillow 10;
+    # Kodi 21 for Windows bundles Pillow 6.2
+    palette = getattr(image_module, "Palette", None)
+    return getattr(palette, "ADAPTIVE", None) if palette is not None else image_module.ADAPTIVE
+
+
+def make_gif(stripe_url: str, count: int, folder: str) -> str:
+    """The animated preview of a file (GIF_FRAME_MS per frame, endless), built from the frames of the
+    preview window (downloaded and cut once, see load_frames). "" for a stripe with a single frame."""
+    path = cached_gif(folder)
+    if path:
+        return path
+    frames = load_frames(stripe_url, count, folder, GIF_TIMEOUT)
+    if len(frames) < 2:
+        mark_unavailable(folder)
+        return ""
+    from PIL import Image
+
+    adaptive = _adaptive_palette(Image)
+    images = []
+    for frame in frames:
+        with Image.open(frame) as image:
+            image = image.convert("RGB")
+            if image.width > GIF_MAX_WIDTH:
+                # LANCZOS explicitly: the default of Pillow 6.2 (Kodi for Windows) is NEAREST
+                image = image.resize((GIF_MAX_WIDTH, max(1, round(image.height * GIF_MAX_WIDTH / image.width))),
+                                     Image.LANCZOS)
+            # One palette per frame: the scenes of a stripe differ a lot
+            images.append(image.convert("P", palette=adaptive, colors=256))
+    path = os.path.join(folder, GIF_FILE)
+    # Its own temporary name: plugin calls are threads of one Kodi process and may build the same GIF
+    temporary = f"{path}.{os.getpid()}-{threading.get_ident()}.part"
+    try:
+        images[0].save(temporary, format="GIF", save_all=True, append_images=images[1:],
+                       duration=GIF_FRAME_MS, loop=0)
+        os.replace(temporary, path)
+    except OSError:
+        if not cached_gif(folder):  # another script finished the same GIF meanwhile: fine
+            raise
+    finally:
+        try:
+            os.remove(temporary)
+        except OSError:
+            pass
+    return path
 
 
 def _http():
@@ -200,10 +287,10 @@ def _http():
     return shared_session()
 
 
-def _download(url: str) -> bytes:
+def _download(url: str, timeout: Tuple[float, float] = DOWNLOAD_TIMEOUT) -> bytes:
     """The stripe bytes; redirects are followed by hand so that every hop is checked by is_stripe_url."""
     for _ in range(MAX_REDIRECTS + 1):
-        with _http().get(url, timeout=DOWNLOAD_TIMEOUT, stream=True, allow_redirects=False) as response:
+        with _http().get(url, timeout=timeout, stream=True, allow_redirects=False) as response:
             if response.is_redirect:
                 url = urljoin(url, response.headers.get("Location", ""))
                 if not is_stripe_url(url):

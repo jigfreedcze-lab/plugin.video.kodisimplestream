@@ -14,7 +14,7 @@ import os
 import ssl
 import sys
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import re
 from urllib.parse import parse_qsl, urlencode
@@ -82,15 +82,44 @@ def _file_details_enabled() -> bool:
     The video preview asks for the details itself and is not affected."""
     return _addon.getSetting("file_details") != "false"
 
-def _resolution_badge_art(source: Dict[str, Any], fallback_image: str = "") -> Dict[str, str]:
-    """Artwork for source rows: the Webshare video preview, or the bundled resolution badge."""
+def _animated_preview() -> bool:
+    """Animated preview as the poster of the focused row (setting, on by default; needs the video preview)."""
+    return _preview_thumbs() and _addon.getSetting("animated_preview") != "false"
+
+def _animation_wanted(file_info: Dict[str, Any]) -> bool:
+    """A row whose animated preview the details script should build: a preview stripe, no GIF yet, no
+    earlier failure (marker in its folder) and Pillow seen working in this session."""
+    if not _animated_preview() or not _has_preview(file_info):
+        return False
+    home = _home()
+    if home is not None and home.getProperty(NO_PILLOW_PROPERTY):
+        return False
+    try:
+        folder = preview.cache_folder(file_info["ident"])
+        return not preview.cached_gif(folder) and not preview.animation_unavailable(folder)
+    except Exception:
+        return False
+
+def _animated_poster(ident: str) -> str:
+    """The animated preview built for a file by the details script, "" when there is none (yet)."""
+    if not ident or not _animated_preview() or not preview.is_valid_ident(ident):
+        return ""
+    try:
+        return preview.cached_gif(preview.cache_folder(ident))
+    except Exception:  # no xbmcvfs (tests), a broken temp folder: the static preview
+        return ""
+
+def _resolution_badge_art(source: Dict[str, Any], fallback_image: str = "", ident: str = "") -> Dict[str, str]:
+    """Artwork for source rows: the Webshare video preview, or the bundled resolution badge.
+    ident: rows of the Webshare lists get the animated preview as the poster once it is built – the Wide
+    list draws the poster only in the panel of the focused row, the rows show the static icon."""
     badge = _icon_path(source_icon_name(source))
     # Kodi downloads and caches the preview itself, only for the rows it shows
     thumb = fallback_image if fallback_image and _preview_thumbs() else badge
     return {
         "icon": thumb,
         "thumb": thumb,
-        "poster": thumb,
+        "poster": _animated_poster(ident) or thumb,
         "landscape": thumb,
         "fanart": fallback_image or badge,
     }
@@ -326,6 +355,11 @@ LISTING_PROPERTY = "kodisimplestream.details_listing"  # search answers of that 
 REFRESH_PROPERTY = "kodisimplestream.details_refresh"  # marker: the next call of this listing is the refresh
 # The same listing starts no second job within this time (Back and forth, a refresh without the marker)
 ENRICH_GUARD_SECONDS = 60
+# Animated previews (issue #5): the first rows with a preview stripe, built by the same script
+GIF_COUNT = 10
+GIF_BUDGET = 12.0
+GIF_REFRESH_MARGIN = 5.0  # one GIF may still take about this long (download timeout preview.GIF_TIMEOUT)
+NO_PILLOW_PROPERTY = "kodisimplestream.no_pillow"
 # The details script refreshes the list only this long after the listing started it
 REFRESH_WINDOW = 20
 # The refreshed listing must run within this time after the marker was set
@@ -386,11 +420,16 @@ def _take_refresh_marker() -> Tuple[bool, Dict[str, Any]]:
     listing = _json_property(home, LISTING_PROPERTY)
     return True, listing if listing.get("key") == key else {}
 
-def _start_details(idents: List[str], top: List[str], listing: Dict[str, Any]) -> None:
+def _start_details(idents: List[str], top: List[str], listing: Dict[str, Any],
+                   animations: Optional[List[List[str]]] = None) -> None:
     """Starts the details script for the unknown ones (idents) of the top rows of the listing being built
-    (not in its refresh)."""
-    if _handle < 0 or _refresh_pass or not _file_details_enabled():
+    (not in its refresh). animations: [ident, stripe URL, frame count] of the rows whose animated preview
+    the same script builds (issue #5)."""
+    if _handle < 0 or _refresh_pass:
         return
+    if not _file_details_enabled():
+        idents = []
+    animations = animations or []
     home = _home()
     if home is None:
         return
@@ -401,19 +440,23 @@ def _start_details(idents: List[str], top: List[str], listing: Dict[str, Any]) -
         home.clearProperty(ENRICH_PROPERTY)
         home.clearProperty(LISTING_PROPERTY)
         job = {}
-    if not idents or file_details.blocked(home):
+    if file_details.blocked(home):
+        idents = []  # file_info is rate limited; the stripes come from another server
+    if not idents and not animations:
         return
     try:
         recent = 0 <= time.time() - float(job.get("time") or 0) < ENRICH_GUARD_SECONDS
     except (TypeError, ValueError):
         recent = False
     # The same rows of the same listing; a new keyboard search has the same URL but other rows
-    if recent and job.get("key") == listing["key"] and job.get("idents") == idents:
+    if (recent and job.get("key") == listing["key"] and job.get("idents") == idents
+            and (job.get("animations") or []) == animations):
         return
     token = hashlib.sha1(f"{listing['key']}|{time.time()}".encode("utf-8")).hexdigest()[:12]
     home.setProperty(LISTING_PROPERTY, json.dumps(listing, ensure_ascii=False, separators=(",", ":")))
     home.setProperty(ENRICH_PROPERTY, json.dumps({"token": token, "key": listing["key"], "idents": idents,
-                                                   "top": top, "time": time.time()}, separators=(",", ":")))
+                                                   "top": top, "animations": animations, "time": time.time()},
+                                                  separators=(",", ":")))
     xbmc.executebuiltin(f"RunPlugin({get_url(action='file_details', token=token)})")
 
 def fetch_details(token: str) -> None:
@@ -423,12 +466,15 @@ def fetch_details(token: str) -> None:
         return
     home = _home()
     job = _json_property(home, ENRICH_PROPERTY)
-    if not token or job.get("token") != token or not isinstance(job.get("idents"), list) or file_details.blocked(home):
+    if not token or job.get("token") != token or not isinstance(job.get("idents"), list):
         return
     cache = _details_cache()
     idents = [ident for ident in job["idents"][:file_details.LIST_COUNT]
               if isinstance(ident, str) and preview.is_valid_ident(ident) and not cache.known(ident)]
-    if not idents:
+    if file_details.blocked(home):
+        idents = []
+    animations = _job_animations(job)
+    if not idents and not animations:
         return
     monitor = xbmc.Monitor()
 
@@ -437,14 +483,65 @@ def fetch_details(token: str) -> None:
         # this one): no further request starts here, so two jobs never run 4 workers each for long
         return monitor.abortRequested() or _json_property(home, ENRICH_PROPERTY).get("token") != token
 
-    fetcher = file_details.Fetcher(idents, file_details.LIST_BUDGET)
-    arrived = fetcher.wait(file_details.LIST_BUDGET + 1, superseded)
-    fetcher.stop()
-    found = _store_details(cache, fetcher, arrived, home)
-    xbmc.log(f"[KodiSimpleStream] file_info for the list: {len(arrived)}/{len(idents)} answers, {found} with details, "
-             f"{time.monotonic() - fetcher.started:.2f} s{_fetch_problem(fetcher)}", xbmc.LOGINFO)
-    if found:
+    found = built = 0
+    # The file_info requests run in their own threads while this one builds the animations
+    fetcher = file_details.Fetcher(idents, file_details.LIST_BUDGET) if idents else None
+    if animations:
+        try:
+            # The one refresh must come within REFRESH_WINDOW of the listing: no GIF starts too late
+            deadline = float(job.get("time") or 0) + REFRESH_WINDOW - GIF_REFRESH_MARGIN
+        except (TypeError, ValueError):
+            deadline = 0.0
+        built = _build_animations(animations, superseded, deadline, home)
+    if fetcher is not None:
+        arrived = fetcher.wait(file_details.LIST_BUDGET + 1, superseded)
+        fetcher.stop()
+        found = _store_details(cache, fetcher, arrived, home)
+        xbmc.log(f"[KodiSimpleStream] file_info for the list: {len(arrived)}/{len(idents)} answers, {found} with details, "
+                 f"{time.monotonic() - fetcher.started:.2f} s{_fetch_problem(fetcher)}", xbmc.LOGINFO)
+    if found or built:
         _refresh_listing(home, job, monitor)
+
+def _job_animations(job: Dict[str, Any]) -> List[Tuple[str, str, int]]:
+    """(ident, stripe URL, frame count) of the job, checked again: the property can be edited by anyone."""
+    if not _animated_preview() or not isinstance(job.get("animations"), list):
+        return []
+    result = []
+    for entry in job["animations"][:GIF_COUNT]:
+        if (isinstance(entry, list) and len(entry) == 3 and all(isinstance(part, str) for part in entry)
+                and preview.is_valid_ident(entry[0]) and preview.is_stripe_url(entry[1])):
+            result.append((entry[0], entry[1], int(entry[2]) if entry[2].isdecimal() and entry[2].isascii() else 0))
+    return result
+
+def _build_animations(animations: List[Tuple[str, str, int]], superseded: Callable[[], bool], deadline: float,
+                      home: Optional[xbmcgui.Window] = None) -> int:
+    """Builds the animated previews one by one within GIF_BUDGET seconds and before deadline (wall clock),
+    returns how many are new. A failure keeps the static preview of that row and is not tried again in this
+    Kodi session (marker in special://temp); without Pillow no list asks again."""
+    began = time.monotonic()
+    built = 0
+    for ident, stripe, count in animations:
+        if superseded() or time.monotonic() - began > GIF_BUDGET or time.time() > deadline:
+            break
+        folder = ""
+        try:
+            folder = preview.cache_folder(ident)
+            if preview.cached_gif(folder):
+                continue
+            if preview.make_gif(stripe, count, folder):
+                built += 1
+        except ImportError as exc:  # no Pillow: none of them would work
+            xbmc.log(f"[KodiSimpleStream] animated previews need Pillow: {exc}", xbmc.LOGINFO)
+            if home is not None:
+                home.setProperty(NO_PILLOW_PROPERTY, "1")
+            break
+        except Exception as exc:  # download, a broken image
+            xbmc.log(f"[KodiSimpleStream] animated preview of {ident} failed: {type(exc).__name__}: {exc}", xbmc.LOGINFO)
+            if folder:
+                preview.mark_unavailable(folder)
+    xbmc.log(f"[KodiSimpleStream] animated previews: {built} new of {len(animations)}, "
+             f"{time.monotonic() - began:.2f} s", xbmc.LOGINFO)
+    return built
 
 def _store_details(cache: file_details.DetailsCache, fetcher: file_details.Fetcher,
                    arrived: Dict[str, Optional[Dict[str, Any]]], home: Optional[xbmcgui.Window]) -> int:
@@ -761,7 +858,7 @@ def list_search_results(
                 "mediatype": "video",
             })
             _set_stream_details(item, source)
-            item.setArt(_resolution_badge_art(source, file_info.get("img", "")))
+            item.setArt(_resolution_badge_art(source, file_info.get("img", ""), file_info["ident"]))
             xbmc.log(
                 f"[KodiSimpleStream] normalized Webshare source quality={source['quality_label']} "
                 f"resolution={source['resolution_label']} name={source['original_name']}",
@@ -785,9 +882,12 @@ def list_search_results(
         xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_SIZE)
         xbmcplugin.setContent(_handle, "videos")
         top = [file_info["ident"] for file_info, _ in sources[:file_details.LIST_COUNT]]
+        # Animated previews of the top rows with a preview stripe that have none yet
+        animations = [[file_info["ident"], file_info["stripe"], str(file_info.get("stripe_count") or "")]
+                      for file_info, _ in sources[:GIF_COUNT] if _animation_wanted(file_info)]
         _start_details([ident for ident in top if not cache.known(ident)], top,
                        {"key": _current_listing_key(), "terms": search_terms, "sort": sort, "offset": offset,
-                        "match": match, "responses": answers})
+                        "match": match, "responses": answers}, animations)
         # replace: a new order of the same search takes the place of the old one in history
         xbmcplugin.endOfDirectory(_handle, updateListing=replace)
     except Exception as exc:

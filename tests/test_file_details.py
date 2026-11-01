@@ -686,5 +686,73 @@ assert fetched == [], fetched
 Addon.settings.pop("file_details")
 groups += 1
 
+# animated previews (issue #5): the top rows with a stripe go into the job, its script builds them (also
+# with no details to fetch) and refreshes once, the refresh shows the GIF as the poster (rows keep the static
+# icon); a failure keeps the static preview; the setting off (or the video preview off) builds nothing
+made = []
+def fake_gif(stripe, count, folder):
+    made.append((os.path.basename(folder), stripe, count))
+    if os.path.basename(folder) == "A1":
+        raise OSError("broken stripe")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, k.preview.GIF_FILE)
+    with open(path, "wb") as handle:
+        handle.write(b"GIF89a")
+    return path
+real_make_gif, k.preview.make_gif = k.preview.make_gif, fake_gif
+Addon.settings["file_details"] = "false"  # only the animations in this job
+anim_files = [dict(ws(f"A{i}", f"Synthetic.Film.2010.A{i}.mkv"), stripe=f"https://img.webshare.cz/s{i}.jpg",
+                   stripe_count="10") for i in range(12)]
+api.files = anim_files
+anim_url = SEARCH_URL.replace("%27a%27", "%27anim%27")
+Window.props.clear(); call(anim_url)
+(run_plugin,) = builtins()
+job = json.loads(Window.props[k.ENRICH_PROPERTY])
+assert job["idents"] == [] and [a[0] for a in job["animations"]] == [f"A{i}" for i in range(k.GIF_COUNT)], job
+assert job["animations"][0] == ["A0", "https://img.webshare.cz/s0.jpg", "10"], job["animations"][0]
+assert all(i.art["poster"] == i.art["icon"] == "https://img.webshare.cz/x.jpg" for i in rows().values())
+info_labels["Container.FolderPath"] = "plugin://plugin.video.kodisimplestream/?" + anim_url
+call(f"action=file_details&token={job['token']}", handle=-1)
+assert [m[0] for m in made] == [f"A{i}" for i in range(k.GIF_COUNT)] and made[0][2] == 10, made
+assert builtins() == ["Container.Refresh"], log
+call(anim_url)  # the refresh: GIF posters, no new job
+posters = {ident: item.art["poster"] for ident, item in rows().items()}
+assert posters["A0"].endswith(os.path.join("A0", k.preview.GIF_FILE)) and rows()["A0"].art["icon"] == "https://img.webshare.cz/x.jpg"
+assert posters["A1"] == posters["A11"] == "https://img.webshare.cz/x.jpg", posters
+assert not any(b.startswith("RunPlugin(") for b in builtins()), log
+# again later: all built, A1 failed and is not tried again in this Kodi session -> no job
+Window.props.clear(); made.clear(); call(anim_url)
+assert k.ENRICH_PROPERTY not in Window.props and k.preview.animation_unavailable(k.preview.cache_folder("A1")), log
+# a job that started too long ago builds nothing (its refresh would come after REFRESH_WINDOW)
+late = {"token": "late", "key": "x", "idents": [], "top": [], "time": time.time() - k.REFRESH_WINDOW,
+        "animations": [["L0", "https://img.webshare.cz/l.jpg", "10"]]}
+Window.props[k.ENRICH_PROPERTY] = json.dumps(late); made.clear()
+call("action=file_details&token=late", handle=-1); assert made == [] and builtins() == [], (made, log)
+# no Pillow: the first failure stops the job and no list asks again in this session
+def no_pillow(stripe, count, folder): made.append(os.path.basename(folder)); raise ImportError("No module named 'PIL'")
+k.preview.make_gif = no_pillow
+fresh = dict(late, token="np", time=time.time(), animations=[["N0", "https://img.webshare.cz/n.jpg", "10"],
+                                                            ["N1", "https://img.webshare.cz/n.jpg", "10"]])
+Window.props[k.ENRICH_PROPERTY] = json.dumps(fresh); made.clear()
+call("action=file_details&token=np", handle=-1)
+assert made == ["N0"] and Window.props.get(k.NO_PILLOW_PROPERTY) and not k.preview.animation_unavailable(k.preview.cache_folder("N0"))
+api.files = [dict(ws("P0", "Synthetic.Film.2010.P0.mkv"), stripe="https://img.webshare.cz/p.jpg", stripe_count="10")]
+Window.props.pop(k.ENRICH_PROPERTY, None); call(anim_url.replace("anim", "np"))
+assert k.ENRICH_PROPERTY not in Window.props, "no Pillow: no animation job"
+k.preview.make_gif = fake_gif; Window.props.pop(k.NO_PILLOW_PROPERTY); api.files = anim_files
+assert k._job_animations({"animations": [["A2", "https://img.webshare.cz/s.jpg", "²"]]}) == [("A2", "https://img.webshare.cz/s.jpg", 0)]
+# the job entries are checked again in the script (the property can be edited)
+assert k._job_animations({"animations": [["A0", "file:///etc/passwd", "1"], ["../x", "https://img.webshare.cz/s.jpg", "1"],
+                                          ["A2", "https://img.webshare.cz/s.jpg", "x"], "junk"]}) == [("A2", "https://img.webshare.cz/s.jpg", 0)]
+# the setting off: no job, the static poster even with a GIF on disk
+for setting in ("animated_preview", "preview_thumbs"):
+    Addon.settings[setting] = "false"; Window.props.clear(); call(anim_url)
+    assert not any(b.startswith("RunPlugin(") for b in builtins()) and k.ENRICH_PROPERTY not in Window.props, (setting, log)
+    assert not rows()["A0"].art["poster"].endswith(k.preview.GIF_FILE), setting
+    assert k._job_animations({"animations": [["A2", "https://img.webshare.cz/s.jpg", "1"]]}) == [], setting
+    Addon.settings.pop(setting)
+k.preview.make_gif = real_make_gif; Addon.settings.pop("file_details"); api.files = FILES
+groups += 1
+
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"file details: {groups} groups of checks passed")
