@@ -267,3 +267,15 @@ msgstr "The best sources do not fit, choose one"
 msgctxt "#30075"
 msgid "Load file details from Webshare (resolution, length, audio)"
 msgstr "Load file details from Webshare (resolution, length, audio)"
+
+msgctxt "#30076"
+msgid "Minimum score in the source picker (0 = show all)"
+msgstr "Minimum score in the source picker (0 = show all)"
+
+msgctxt "#30077"
+msgid "Show {} more sources below the minimum score"
+msgstr "Show {} more sources below the minimum score"
+
+msgctxt "#30078"
+msgid "No source reaches the minimum score ({} hidden)"
+msgstr "No source reaches the minimum score ({} hidden)"

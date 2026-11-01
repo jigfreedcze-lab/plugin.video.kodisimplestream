@@ -267,3 +267,15 @@ msgstr "Nejlepší zdroje nesedí, vyberte ručně"
 msgctxt "#30075"
 msgid "Load file details from Webshare (resolution, length, audio)"
 msgstr "Načítat údaje o souborech z Webshare (rozlišení, délka, zvuk)"
+
+msgctxt "#30076"
+msgid "Minimum score in the source picker (0 = show all)"
+msgstr "Minimální skóre ve výběru zdrojů (0 = zobrazit vše)"
+
+msgctxt "#30077"
+msgid "Show {} more sources below the minimum score"
+msgstr "Zobrazit další zdroje pod minimálním skóre ({})"
+
+msgctxt "#30078"
+msgid "No source reaches the minimum score ({} hidden)"
+msgstr "Žádný zdroj nedosahuje minimálního skóre (skryto: {})"

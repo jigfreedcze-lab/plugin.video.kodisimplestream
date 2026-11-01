@@ -59,7 +59,7 @@ STRINGS = {30042: "dabing", 30043: "titulky", 30061: "Video", 30062: "Bitrate", 
 
 
 class Addon:
-    settings = {"username": "u", "password": "p"}
+    settings = {"username": "u", "password": "p", "tmdbh_picker_min_score": "0"}  # 0: these checks see all rows
     def getSetting(self, k): return self.settings.get(k, "")
     def getSettingBool(self, k): return self.settings.get(k) == "true"
     def getLocalizedString(self, i): return STRINGS.get(i, f"#{i}")

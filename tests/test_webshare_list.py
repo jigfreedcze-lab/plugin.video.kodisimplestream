@@ -26,7 +26,7 @@ STRINGS = {30007: "Chyba vyhledávání: {}", 30008: "Nenalezeno", 30037: "Řaze
            30030: "Shoda", 30031: "Hodnocení", 30032: "Nejnovější", 30033: "Největší", 30034: "Nejmenší"}
 
 class Addon:
-    settings = {"username": "u", "password": "p", "ws_sort": ""}
+    settings = {"username": "u", "password": "p", "ws_sort": "", "tmdbh_picker_min_score": "0"}  # 0: the older checks see all rows
     def getSetting(self, k): return self.settings.get(k, "")
     def getSettingBool(self, k): return self.settings.get(k) == "true"
     def getLocalizedString(self, i): return STRINGS.get(i, f"#{i}")
@@ -457,3 +457,45 @@ import ssl
 assert [e for e in log if e[0] == "log"] == [("log", f"[KodiSimpleStream] {ssl.OPENSSL_VERSION}")], log
 k.WebshareAPI = orig_api
 print("OpenSSL v logu: OK")
+
+# 23. Minimální skóre ve výběru zdroje TMDb Helperu: filtr před omezením počtu, řádek „zobrazit další“ ukáže i zdroje
+#     pod prahem, všechno pod prahem = upozornění a stejný řádek, ručně změněné hledání se nefiltruje, 0 = vypnuto
+r = lambda ident, score: {"ident": ident, "score": score}
+order = [r("lang", 50), r("a", 90), r("b", 85), r("c", 70), r("d", 81)]  # pořadí řazení (jazykový bonus) ≠ skóre
+Addon.settings["tmdbh_max_results"] = "2"
+assert k._picker_sources(order, 80, False) == ([order[1], order[2]], 2), "nad prahem nejvýš 2, pod prahem 2"
+assert k._picker_sources(order, 80, True) == ([order[1], order[2], order[0], order[3]], 0)
+assert k._picker_sources(order + [r("e", 10), r("f", 5)], 80, False)[1] == 4, "skutečný počet, ne omezený"
+assert len(k._picker_sources(order + [r("e", 10), r("f", 5)], 80, True)[0]) == 6, "rozbalený seznam má všechny"
+assert k._picker_sources([r("x", 80), r("y", 79)], 80, False) == ([r("x", 80)], 1), "práh včetně"
+assert k._picker_sources(order, 0, False) == (order[:2], 0) and k._picker_sources(order, -5, False) == (order[:2], 0)
+assert k._picker_sources([r("x", -10)], 0, False) == ([r("x", -10)], 0), "0 = vypnuto, i záporné skóre"
+Addon.settings["tmdbh_max_results"] = "20"
+for value, expected in (("", 50), ("abc", 50), ("120", 120), ("0", 0)):
+    Addon.settings["tmdbh_picker_min_score"] = value; assert k._picker_min_score() == expected, value
+good, bad = src("G", "Film.2020.1080p.mkv"), src("L", "Jiny.2019.mkv")
+gs, ls = k.score_movie_result(good, tm), k.score_movie_result(bad, tm)
+assert gs > ls, (gs, ls)
+threshold = (gs + ls) // 2 + 1
+api = FakeAPI({("Film 2020", 0): (2, [good, bad]), ("Jiný", 0): (1, [src("J", "Jiny.film.mkv")])}); k.get_api = lambda: api
+Addon.settings.update(tmdbh_picker_min_score=str(threshold))
+def rows(pick): return [i.label for i in pick[1]]
+log.clear(); selects[:] = [2, 2]; k.tmdbh_play(tm)  # řádek „další“, pak L z rozbaleného seznamu
+picks = [e for e in log if e[0] == "select"]
+assert len(picks) == 2 and len(rows(picks[0])) == 3 and rows(picks[0])[-1] == "#30077" and len(rows(picks[1])) == 3, [rows(p) for p in picks]
+assert "#30077" not in rows(picks[1]) and log[-1] == ("resolved", True, "https://dl/x") and api.links[-1] == "L", api.links
+Addon.settings.update(tmdbh_picker_min_score=str(gs + 1))  # všechno pod prahem
+log.clear(); selects[:] = [1, 1]; k.tmdbh_play(tm)  # řádek „další“, pak první skrytý
+assert ("notif", "#30078") in log and rows([e for e in log if e[0] == "select"][0]) == [rows(picks[0])[0], "#30077"], log
+assert len([e for e in log if e[0] == "select"]) == 2 and log[-1] == ("resolved", True, "https://dl/x") and api.links[-1] == "G", log
+log.clear(); selects[:] = [0, -1]; inputs[:] = ["Jiný"]; k.tmdbh_play(tm)  # ruční dotaz: J pod prahem, i tak vidět
+picks = [e for e in log if e[0] == "select"]
+assert len(picks) == 2 and len(rows(picks[1])) == 2 and "#30077" not in rows(picks[1]), [rows(p) for p in picks]
+assert k.score_movie_result(src("J", "Jiny.film.mkv"), tm) < gs + 1
+# auto-play pod prahem otevře výběr se stejným filtrem
+Addon.settings.update(tmdbh_auto_play_best="true", tmdbh_auto_play_min_score="1000", tmdbh_picker_min_score=str(threshold))
+log.clear(); selects[:] = [1]; k.tmdbh_play(tm)
+picks = [e for e in log if e[0] == "select"]
+assert len(picks) == 1 and rows(picks[0])[-1] == "#30077" and api.links[-1] == "G", (rows(picks[0]), api.links)
+Addon.settings.update(tmdbh_auto_play_best="", tmdbh_auto_play_min_score="", tmdbh_picker_min_score="0")
+print("minimální skóre ve výběru: OK")

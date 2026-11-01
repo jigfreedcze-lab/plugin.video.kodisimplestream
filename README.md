@@ -124,6 +124,7 @@ stopáž nepředává (v řetězci přehrávače není žádná proměnná s dé
 Nová nastavení addonu (sekce **TMDb Helper**):
 - **Auto-play best source** – automaticky přehraje nejlépe skórovaný zdroj.
 - **Auto-play minimum score** – minimální skóre, od kterého dojde k auto-play.
+- **Minimum score in the source picker** – zdroje pod tímto skóre se ve výběru zdroje neukážou; poslední řádek „Zobrazit další zdroje pod minimálním skóre“ zobrazí i všechny skryté. Výsledky ručně změněného hledání se nefiltrují. Výchozí 50 (podle benchmarku zůstane asi 98 % správných souborů a skryje se asi 9 z 10 ostatních), 0 = zobrazit vše. Práh obvykle volte nižší než pro auto-play.
 - **Maximum ranked results** – omezení počtu kandidátů v seznamu.
 - **Preferred quality mode** – jemné řazení kvality (`1080p_or_best`, `720p_or_best`, `highest`).
 - **Show debug scores in labels and logs** – zobrazí skóre i v názvech položek a logu.

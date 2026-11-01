@@ -993,14 +993,16 @@ def _prefer_quality_value(name: str) -> int:
     return base if base >= 3 else 0
 
 
-def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
+def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] = None,
+                           capped: bool = True) -> Optional[List[Dict[str, Any]]]:
     """Searches Webshare for TMDb Helper and scores the files, best first.
+    capped=False: all files, the source picker filters them by the minimum score before it caps the list.
     None when no query got an answer from Webshare (the user was notified)."""
     queries = [search_query] if search_query else build_tmdbh_queries(params)
     if not queries:
         return []
 
-    max_results = int(_addon.getSetting("tmdbh_max_results") or "20")
+    max_results = _max_tmdbh_results()
     mediatype = (params.get("mediatype") or "movie").lower()
     merged: Dict[str, Dict[str, Any]] = {}
 
@@ -1073,7 +1075,34 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
                 f"[KodiSimpleStream] score={it['score']} quality={it['quality']} size={it['size']} name={it['name']}",
                 xbmc.LOGINFO,
             )
-    return sorted_items[:max_results]
+    return sorted_items[:max_results] if capped else sorted_items
+
+
+def _max_tmdbh_results() -> int:
+    return int(_addon.getSetting("tmdbh_max_results") or "20")
+
+
+def _picker_min_score() -> int:
+    """Minimum match score of the rows in the source picker; 0 or less shows all (scores can be negative).
+    The default 50 keeps about 98 % of the right files and hides about 9 in 10 others (benchmark, issue #8)."""
+    try:
+        return int(_addon.getSetting("tmdbh_picker_min_score") or "50")
+    except ValueError:
+        return 50
+
+
+def _picker_sources(results: List[Dict[str, Any]], min_score: int, expanded: bool) -> Tuple[List[Dict[str, Any]], int]:
+    """Rows of the source picker and how many sources below the minimum score a "show more" row offers.
+    Filtered before the tmdbh_max_results cap, so the cap counts only the sources that are shown. Expanded:
+    the shown ones and then all those below the score, so no found source is out of reach."""
+    limit = _max_tmdbh_results()
+    if min_score <= 0:
+        return results[:limit], 0
+    above = [result for result in results if result["score"] >= min_score][:limit]
+    below = [result for result in results if result["score"] < min_score]
+    if expanded:
+        return above + below, 0
+    return above, len(below)
 
 
 def _tmdbh_sort_key(preference: str):
@@ -1243,37 +1272,58 @@ def select_tmdbh_source(params: Dict[str, Any], results: Optional[List[Dict[str,
     fetcher: those of the auto-play check, one fetcher for the whole plugin call."""
     current_query = _primary_tmdbh_query(params)
     active_query: Optional[str] = None
+    expanded = False  # the "show more" row was chosen: the sources below the minimum score too
+    notified = False  # "no source reaches the minimum score" once, not again after a cancelled new search
     cache = cache or _details_cache()
     if fetcher is None:
         fetcher = file_details.Fetcher([], 0)
 
     while True:
         if results is None:
-            results = search_and_score_tmdbh(params, active_query)
+            results = search_and_score_tmdbh(params, active_query, capped=False)
             if results is None:
                 xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
                 return
-        if results:
+        # A changed search looks for other names on purpose, the score compares them with the TMDb title
+        min_score = 0 if active_query else _picker_min_score()
+        shown, hidden = _picker_sources(results, min_score, expanded)
+        if shown:
             # One constant for all devices: the wait ends as soon as all answers are in (about 0.3 s on a PC),
             # the deadline only caps slow ones (TV boxes with a slow TLS handshake)
-            _fetch_tmdbh_details(results, file_details.PICKER_COUNT, file_details.PICKER_DEADLINE, cache, fetcher)
+            _fetch_tmdbh_details(shown, file_details.PICKER_COUNT, file_details.PICKER_DEADLINE, cache, fetcher)
             _apply_tmdbh_details(results, params, cache)
-        if not results:
+            shown, hidden = _picker_sources(results, min_score, expanded)
+        if not shown and not hidden:
             xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
             new_query = prompt_change_search(current_query)
             if new_query:
                 current_query = new_query
                 active_query = new_query
                 results = None
+                expanded = False
                 continue
             xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
             return
+        if not shown and not notified:
+            # All below the minimum score: the picker still offers them (the "show more" row) and a new search
+            notified = True
+            xbmcgui.Dialog().notification(
+                _addon.getAddonInfo("name"),
+                _addon.getLocalizedString(30078).format(hidden),  # "No source reaches the minimum score ({} hidden)"
+                xbmcgui.NOTIFICATION_INFO,
+                4000,
+            )
 
         labels = [f"Search query: {current_query or 'Webshare'}  •  Change search"]
-        labels.extend(_tmdbh_source_label(result) for result in results)
+        labels.extend(_tmdbh_source_label(result) for result in shown)
         listitems = [xbmcgui.ListItem(label=f"Search query: {current_query or 'Webshare'}", label2="Change search")]
         listitems[0].setArt({"icon": "DefaultAddonsSearch.png", "thumb": "DefaultAddonsSearch.png"})
-        listitems.extend(_tmdbh_source_listitem(result) for result in results)
+        listitems.extend(_tmdbh_source_listitem(result) for result in shown)
+        if hidden:
+            more = _addon.getLocalizedString(30077).format(hidden)  # "Show {} more sources below the minimum score"
+            labels.append(more)
+            listitems.append(xbmcgui.ListItem(label=more))
+            listitems[-1].setArt({"icon": "DefaultAddonNone.png", "thumb": "DefaultAddonNone.png"})
         selected = _select_tmdbh_dialog(labels, listitems)
         if selected < 0:
             xbmc.log("[KodiSimpleStream] TMDbH source selection cancelled", xbmc.LOGINFO)
@@ -1285,10 +1335,14 @@ def select_tmdbh_source(params: Dict[str, Any], results: Optional[List[Dict[str,
                 current_query = new_query
                 active_query = new_query
                 results = None
+                expanded = notified = False
             # Cancelled change shows the same sources again
             continue
+        if hidden and selected == len(shown) + 1:
+            expanded = True
+            continue
 
-        chosen = results[selected - 1]
+        chosen = shown[selected - 1]
         xbmc.log(f"[KodiSimpleStream] TMDbH selected source score={chosen['score']} name={chosen['name']}", xbmc.LOGINFO)
         play_ident(chosen["ident"])
         return
@@ -1327,7 +1381,7 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
 
 
 def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
-    results = search_and_score_tmdbh(params)
+    results = search_and_score_tmdbh(params, capped=False)
     if results is None:
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
@@ -1337,6 +1391,8 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
         return
 
     min_score = int(_addon.getSetting("tmdbh_auto_play_min_score") or "80")
+    # The whole list comes for the picker filter; auto-play still looks only at what the picker would list
+    candidates = min(file_details.AUTOPLAY_COUNT, _max_tmdbh_results())
     best = results[0]
     cache = _details_cache()
     fetcher = file_details.Fetcher([], 0)  # one for the check and the picker after it
@@ -1349,11 +1405,11 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
     # Details only when they can change the choice: the length check needs the runtime (TMDb Helper does
     # not pass one, see docs/tmdbhelper), a CZE track the Czech dub preference
     if file_details.runtime_minutes(params.get("runtime")) or language_preference() == "cz_audio":
-        _fetch_tmdbh_details(results, file_details.AUTOPLAY_COUNT, file_details.AUTOPLAY_DEADLINE, cache, fetcher)
+        _fetch_tmdbh_details(results, candidates, file_details.AUTOPLAY_DEADLINE, cache, fetcher)
     _apply_tmdbh_details(results, params, cache)
     # The first of the best candidates above the threshold that is not a trailer, a part, another year
     # or of a wrong length; none -> the picker, never a doubtful file
-    for candidate in results[:file_details.AUTOPLAY_COUNT]:
+    for candidate in results[:candidates]:
         if candidate["score"] < min_score:
             continue
         rejection = _autoplay_rejection(candidate, params)
