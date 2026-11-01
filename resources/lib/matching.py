@@ -104,14 +104,21 @@ _LATIN = re.compile(r"[a-z0-9]")
 _TOKEN = re.compile(r"[^\W_]+|[\[\](){}|/]|\s-+\s|\s-+(?=\S)|-{2,}")
 _EXTENSION = re.compile(r"\.[a-z0-9]{2,4}$", re.IGNORECASE)
 _YEAR = re.compile(r"^(19\d{2}|20\d{2})$")
-_TECHNICAL = re.compile(r"^\d+[a-z]{1,2}\d*$|^s\d{1,2}(e\d{1,3})?$|^e\d{1,3}$|^\d{1,2}x\d{2,3}$")
-_EPISODE_TAG = re.compile(r"(?<![a-z0-9])s(\d{1,2})\s?[ ._-]?\s?e(\d{1,3})((?:\s?-\s?e?\d{1,3}|e\d{1,3})*)(?![0-9])")
-_EPISODE_X = re.compile(r"(?<![a-z0-9])(\d{1,2})x(\d{2,3})(?:-(\d{2,3}))?(?![0-9a-z])")
-_EPISODE_AFTER = re.compile(r"(?<![a-z0-9])(?:e|ep|episode|epizoda|dil)\s*(\d{1,3})(?![0-9])")
+_TECHNICAL = re.compile(r"^\d+[a-z]{1,2}\d*$|^s\d{1,2}(e\d{1,4})?$|^e\d{1,4}$|^\d{1,2}x\d{1,3}$")
+# Episode numbers: up to 999, four digits only when not a year or a resolution (One Piece E1001, not E2160p)
+_EPISODE_NUMBER = r"(\d{1,3}|(?!19\d\d|20\d\d)\d{4}(?![pi]))"
+_EPISODE_TAG = re.compile(r"(?<![a-z0-9])s(\d{1,2})\s?[ ._-]?\s?e" + _EPISODE_NUMBER
+                          + r"((?:\s?-\s?e?\d{1,3}|e\d{1,3})*)(?![0-9])")
+_YEAR_IN_TEXT = re.compile(r"(?<![0-9])(?:19|20)\d\d(?![0-9])")
+# Resolutions written without "p" are no absolute episode numbers
+_RESOLUTIONS = frozenset({"1080", "1440", "2160"})
+_EPISODE_X = re.compile(r"(?<![a-z0-9])(\d{1,2})x(\d{1,3})(?:-(\d{1,3}))?(?![0-9a-z])")
+_EPISODE_AFTER = re.compile(r"(?<![a-z0-9])(?:e|ep|episode|epizoda|dil)\s*" + _EPISODE_NUMBER + r"(?![0-9])")
 _EPISODE_BEFORE = re.compile(r"(?<![a-z0-9])(\d{1,3})\s*(?:dil|epizoda|episode)(?![a-z])")
 _SEASON_ONLY = re.compile(r"(?<![a-z0-9])(?:s(\d{1,2})(?![0-9]|\s?[ ._-]?\s?e\d)"
                           r"|(?:season|serie|series|rada)\s*(\d{1,2})(?![0-9])|(\d{1,2})\s*(?:season|serie|rada)(?![a-z]))")
 # Czech "making of" ("Film o filmu", "Film o seriálu"); after + or & it is a bonus in the file of the film
+_MAKING_OF = re.compile(r"(?<![^\W_])making[\s._-]+of(?![^\W_])")
 _CZECH_MAKING_OF = re.compile(r"([+&]?)[\s._-]*(?<![^\W_])film[\s._-]+o[\s._-]+(filmu|serialu)(?![^\W_])")
 
 
@@ -133,9 +140,15 @@ def fold_text(value: Any) -> str:
     return "".join(ch for ch in text if not unicodedata.combining(ch))
 
 
+_DECIMAL = re.compile(r"(?<!\d)(\d{1,2})\.(\d{1,2})(?![\d])")
+
+
 def _separators(text: str) -> str:
-    """Dots and underscores between words become spaces, decimal dots (5.1, H.264) stay."""
-    return re.sub(r"(?<!\d)\.|\.(?!\d)", " ", text.replace("_", " "))
+    """Dots and underscores between words become spaces. Decimal dots of short numbers stay (DD5.1, 2.0);
+    a dot before a longer number separates (Avatar.2.2022 is part 2 of 2022, not 2.2022)."""
+    text = text.replace("_", " ")
+    decimal = {found.end(1) for found in _DECIMAL.finditer(text)}  # positions of the decimal dots
+    return "".join(" " if char == "." and index not in decimal else char for index, char in enumerate(text))
 
 
 def tokenize(value: Any) -> List[str]:
@@ -189,6 +202,31 @@ def _other_title(title: str, other: str) -> str:
     return ""
 
 
+def other_script(text: str) -> bool:
+    """Letters neither Latin nor Cyrillic (Japanese, Korean, Chinese...): Webshare names rarely use them.
+    Cyrillic ones are common and fold_text transliterates them."""
+    return any(not unicodedata.name(ch, "").startswith(("LATIN", "CYRILLIC")) for ch in text if ch.isalpha())
+
+
+def english_title_key(params: Dict[str, Any]) -> str:
+    """Parameter for the English title that the TMDb Helper flow should look up (TMDb Helper does not pass
+    one): the original title is in another script (Japanese, Korean...), "" otherwise."""
+    episode = str(params.get("mediatype") or "").lower() == "episode"
+    original_keys, english_keys = ((SHOW_ORIGINAL_KEYS, SHOW_ENGLISH_KEYS) if episode
+                                   else (MOVIE_ORIGINAL_KEYS, MOVIE_ENGLISH_KEYS))
+    original = _first_non_empty(params, original_keys)
+    if not original or not other_script(original) or _first_non_empty(params, english_keys):
+        return ""
+    return english_keys[0]
+
+
+def _query_original(title: str, original: str, english: str) -> str:
+    """The second title of the queries: the original, the English one instead of an original in another script."""
+    if original and other_script(original) and _other_title(title, english):
+        return _other_title(title, english)
+    return _other_title(title, original)
+
+
 def _main_part(title: str) -> str:
     """Title before a subtitle: "Island 2: The Return" -> "Island 2"."""
     for separator in (":", " - ", " – "):
@@ -224,7 +262,8 @@ def _episode_queries(params: Dict[str, Any]) -> List[str]:
     if not showname or season < 0 or episode <= 0:
         return []
     tag = f"S{season:02d}E{episode:02d}"
-    original = _other_title(showname, _first_non_empty(params, SHOW_ORIGINAL_KEYS))
+    original = _query_original(showname, _first_non_empty(params, SHOW_ORIGINAL_KEYS),
+                               _first_non_empty(params, SHOW_ENGLISH_KEYS))
     episode_title = _first_non_empty(params, EPISODE_TITLE_KEYS)
     queries = [f"{showname} {tag}"]
     if original:
@@ -247,7 +286,8 @@ def build_tmdbh_queries(params: Dict[str, Any]) -> List[str]:
     if not title:
         return []
     year = _first_non_empty(params, ["year", "premiered"])[:4]
-    original = _other_title(title, _first_non_empty(params, MOVIE_ORIGINAL_KEYS))
+    original = _query_original(title, _first_non_empty(params, MOVIE_ORIGINAL_KEYS),
+                               _first_non_empty(params, MOVIE_ENGLISH_KEYS))
     queries = [f"{title} {year}" if year else title, title]
     if original:
         queries += [f"{original} {year}" if year else original, original]
@@ -299,6 +339,8 @@ def _has_bad_tokens(text: str, vocabulary: Optional[Set[str]] = None) -> bool:
     words = set(tokenize(_EXTENSION.sub("", text or ""))) - vocabulary
     if words & BAD_TOKENS or ("making" in words and "of" in words):
         return True
+    if not {"making", "of"} <= vocabulary and _MAKING_OF.search(_separators(fold_text(text))):
+        return True
     return any(not found.group(1) and not {"film", "o", found.group(2)} <= vocabulary
                for found in _CZECH_MAKING_OF.finditer(fold_text(text)))
 
@@ -318,7 +360,10 @@ def _sxe_tags(text: str) -> Set[Tuple[int, int]]:
 
 def _x_tags(text: str) -> Set[Tuple[int, int]]:
     episodes: Set[Tuple[int, int]] = set()
+    has_year = bool(_YEAR_IN_TEXT.search(text))
     for found in _EPISODE_X.finditer(text):
+        if len(found.group(2)) == 1 and has_year:
+            continue  # 4x3, 2x1 of a film (aspect ratio, two films), not episode 3
         season, first = int(found.group(1)), int(found.group(2))
         last = int(found.group(3)) if found.group(3) else first
         if season == 0 or first > 300:
@@ -416,9 +461,12 @@ class _FileName:
             self.positions.setdefault(token, []).append(index)
         for index, token in enumerate(self.tokens):
             if not token.isalpha() and not token.isdigit():
-                # Island2, 1Island
-                for part in re.findall(r"[^\W\d_]{2,}|\d+", token):
-                    if part != token:
+                # Island2, 1Island, 2Fast2Furious; a single letter between digits is leetspeak (H0us3)
+                runs = re.findall(r"[^\W\d_]+|\d+", token)
+                if any(len(run) == 1 and run.isalpha() for run in runs):
+                    continue
+                for part in runs:
+                    if part != token and (len(part) >= 2 or part.isdigit()):
                         self.positions.setdefault(part, []).append(index)
         self.joined: Dict[str, int] = {}
         for index in range(len(self.tokens) - 1):
@@ -590,6 +638,13 @@ def _explained(token: str, vocabulary: Set[str]) -> bool:
             or len(token) <= 1 or bool(_YEAR.match(token)) or bool(_TECHNICAL.match(token)))
 
 
+def _unexplained_words(file: _FileName, vocabulary: Set[str], end: int) -> bool:
+    """A word before position end (where another show title would stand), outside [group] tags, that is
+    neither a title word nor a release, language or episode word; release groups after it do not count."""
+    return any(not file.in_brackets[index] and not _explained(file.tokens[index], vocabulary)
+               for index in range(file.lead, max(file.lead, end)))
+
+
 def _extra_words(file: _FileName, match: _TitleMatch, vocabulary: Set[str]) -> float:
     """Share of unknown words before the title and right after it ("Island Matter", "Return to the Island")
     among the title words: one word more is a lot for a one-word title."""
@@ -681,7 +736,7 @@ def _absolute_number(file: _FileName, match: _TitleMatch, vocabulary: Set[str]) 
     if match.title.weight < 1.0 or index >= len(file.tokens) or file.decimal[index]:
         return 0
     token = file.tokens[index]
-    if not token.isdigit() or len(token) > 3:
+    if not token.isdigit() or len(token) > 4 or _YEAR.match(token) or token in _RESOLUTIONS:
         return 0
     following = index + 1
     if following < len(file.tokens):
@@ -707,8 +762,11 @@ def score_episode_result(file_info: Dict[str, Any], params: Dict[str, Any]) -> i
     vocabulary = _vocabulary(titles) | _vocabulary(episode_titles)
     episode_match = _best_title(episode_titles, file)
     episode_title_ok = bool(episode_match) and episode_match.coverage >= TITLE_OK
-    # The episode title stands in for a missing show title ("S01E05 - Episode name.mkv" in a show folder)
-    show_factor = 1.0 if show_ok or episode_title_ok else NO_SHOW_FACTOR
+    # The episode title stands in for a missing show title ("S01E05 - Episode name.mkv" in a show folder);
+    # a one-word one only when no other words could be the title of another show (Other.Show.S05E14.Name)
+    stand_in = episode_title_ok and (episode_match.title.significant >= 2
+                                     or not _unexplained_words(file, vocabulary, episode_match.start))
+    show_factor = 1.0 if show_ok or stand_in else NO_SHOW_FACTOR
 
     if season >= 0 and episode > 0:
         if (season, episode) in file.episodes:

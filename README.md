@@ -110,7 +110,8 @@ Nápady na vylepšení i opravy jsou vítány – založte Issue nebo rovnou po�
 ### TMDb Helper integrace
 1. Zkopírujte soubor `docs/tmdbhelper/kodisimplestream.json` do:
    `userdata/addon_data/plugin.video.themoviedb.helper/players/kodisimplestream.json`
-   Pokud už tam starší soubor je, přepište jej novou verzí.
+   Pokud už tam starší soubor je, přepište jej novou verzí. Starší soubor posílal místo originálního názvu
+   seriálu a TMDb id jen `_` (neexistující klíče `{show_originaltitle}`, `{tmdb_id}`, `{imdb_id}`).
 2. V TMDb Helper otevřete nastavení přehrávačů a povolte/vyberte `KodiSimpleStream`.
 3. TMDb Helper pak při kliknutí na film/epizodu zavolá trasu:
    `plugin://plugin.video.kodisimplestream/?action=tmdbh_play...`

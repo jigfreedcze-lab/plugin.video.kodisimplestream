@@ -1,0 +1,1073 @@
+[
+ {
+  "id": "obecna_skola",
+  "type": "movie",
+  "category": "cz_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:18141",
+   "cs": "Obecná škola",
+   "original": "Obecná škola",
+   "original_language": "cs",
+   "english": "The Elementary School",
+   "year": "1991",
+   "imdb_id": "tt0102571",
+   "addon_title": "Obecná škola",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Obecná škola",
+   "originaltitle": "",
+   "year": "1991"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Obecná škola",
+   "originaltitle": "Obecná škola",
+   "year": "1991",
+   "imdb_id": "tt0102571",
+   "tmdb_id": "18141"
+  },
+  "pool_size": 109
+ },
+ {
+  "id": "ted_2012",
+  "type": "movie",
+  "category": "short_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:72105",
+   "cs": "Méďa",
+   "original": "Ted",
+   "original_language": "en",
+   "english": "Ted",
+   "year": "2012",
+   "imdb_id": "tt1637725",
+   "addon_title": "Méďa",
+   "addon_original_title": "Ted"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Méďa",
+   "originaltitle": "Ted",
+   "year": "2012"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Méďa",
+   "originaltitle": "Ted",
+   "year": "2012",
+   "imdb_id": "tt1637725",
+   "tmdb_id": "72105"
+  },
+  "pool_size": 147
+ },
+ {
+  "id": "elf_2003",
+  "type": "movie",
+  "category": "short_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:10719",
+   "cs": "Vánoční skřítek",
+   "original": "Elf",
+   "original_language": "en",
+   "english": "Elf",
+   "year": "2003",
+   "imdb_id": "tt0319343",
+   "addon_title": "Vánoční skřítek",
+   "addon_original_title": "Elf"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Vánoční skřítek",
+   "originaltitle": "Elf",
+   "year": "2003"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Vánoční skřítek",
+   "originaltitle": "Elf",
+   "year": "2003",
+   "imdb_id": "tt0319343",
+   "tmdb_id": "10719"
+  },
+  "pool_size": 134
+ },
+ {
+  "id": "saw_2004",
+  "type": "movie",
+  "category": "short_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:176",
+   "cs": "Saw: Hra o přežití",
+   "original": "Saw",
+   "original_language": "en",
+   "english": "Saw",
+   "year": "2004",
+   "imdb_id": "tt0387564",
+   "addon_title": "Saw: Hra o přežití",
+   "addon_original_title": "Saw"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Saw: Hra o přežití",
+   "originaltitle": "Saw",
+   "year": "2004"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Saw: Hra o přežití",
+   "originaltitle": "Saw",
+   "year": "2004",
+   "imdb_id": "tt0387564",
+   "tmdb_id": "176"
+  },
+  "pool_size": 146
+ },
+ {
+  "id": "nope_2022",
+  "type": "movie",
+  "category": "short_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:762504",
+   "cs": "Nene",
+   "original": "Nope",
+   "original_language": "en",
+   "english": "Nope",
+   "year": "2022",
+   "imdb_id": "tt10954984",
+   "addon_title": "Nene",
+   "addon_original_title": "Nope"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Nene",
+   "originaltitle": "Nope",
+   "year": "2022"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Nene",
+   "originaltitle": "Nope",
+   "year": "2022",
+   "imdb_id": "tt10954984",
+   "tmdb_id": "762504"
+  },
+  "pool_size": 141
+ },
+ {
+  "id": "heat_1995",
+  "type": "movie",
+  "category": "short_title",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:949",
+   "cs": "Nelítostný souboj",
+   "original": "Heat",
+   "original_language": "en",
+   "english": "Heat",
+   "year": "1995",
+   "imdb_id": "tt0113277",
+   "addon_title": "Nelítostný souboj",
+   "addon_original_title": "Heat"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Nelítostný souboj",
+   "originaltitle": "Heat",
+   "year": "1995"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Nelítostný souboj",
+   "originaltitle": "Heat",
+   "year": "1995",
+   "imdb_id": "tt0113277",
+   "tmdb_id": "949"
+  },
+  "pool_size": 139
+ },
+ {
+  "id": "oldboy_2003",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:670",
+   "cs": "Old Boy",
+   "original": "올드보이",
+   "original_language": "ko",
+   "english": "Oldboy",
+   "year": "2003",
+   "imdb_id": "tt0364569",
+   "addon_title": "Old Boy",
+   "addon_original_title": "Oldboy"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Old Boy",
+   "originaltitle": "Oldboy",
+   "year": "2003"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Old Boy",
+   "originaltitle": "올드보이",
+   "year": "2003",
+   "imdb_id": "tt0364569",
+   "tmdb_id": "670"
+  },
+  "pool_size": 122
+ },
+ {
+  "id": "akira_1988",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:149",
+   "cs": "Akira",
+   "original": "AKIRA",
+   "original_language": "ja",
+   "english": "Akira",
+   "year": "1988",
+   "imdb_id": "tt0094625",
+   "addon_title": "Akira",
+   "addon_original_title": "AKIRA"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Akira",
+   "originaltitle": "AKIRA",
+   "year": "1988"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Akira",
+   "originaltitle": "AKIRA",
+   "year": "1988",
+   "imdb_id": "tt0094625",
+   "tmdb_id": "149"
+  },
+  "pool_size": 99
+ },
+ {
+  "id": "princezna_mononoke",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:128",
+   "cs": "Princezna Mononoke",
+   "original": "もののけ姫",
+   "original_language": "ja",
+   "english": "Princess Mononoke",
+   "year": "1997",
+   "imdb_id": "tt0119698",
+   "addon_title": "Princezna Mononoke",
+   "addon_original_title": "Princess Mononoke"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Princezna Mononoke",
+   "originaltitle": "Princess Mononoke",
+   "year": "1997"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Princezna Mononoke",
+   "originaltitle": "もののけ姫",
+   "year": "1997",
+   "imdb_id": "tt0119698",
+   "tmdb_id": "128"
+  },
+  "pool_size": 137
+ },
+ {
+  "id": "zamek_v_oblacich",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:4935",
+   "cs": "Zámek v oblacích",
+   "original": "ハウルの動く城",
+   "original_language": "ja",
+   "english": "Howl's Moving Castle",
+   "year": "2004",
+   "imdb_id": "tt0347149",
+   "addon_title": "Zámek v oblacích",
+   "addon_original_title": "Howl's Moving Castle"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Zámek v oblacích",
+   "originaltitle": "Howl's Moving Castle",
+   "year": "2004"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Zámek v oblacích",
+   "originaltitle": "ハウルの動く城",
+   "year": "2004",
+   "imdb_id": "tt0347149",
+   "tmdb_id": "4935"
+  },
+  "pool_size": 155
+ },
+ {
+  "id": "tygr_a_drak",
+  "type": "movie",
+  "category": "non_latin_movie",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:146",
+   "cs": "Tygr a drak",
+   "original": "卧虎藏龍",
+   "original_language": "zh",
+   "english": "Crouching Tiger, Hidden Dragon",
+   "year": "2000",
+   "imdb_id": "tt0190332",
+   "addon_title": "Tygr a drak",
+   "addon_original_title": "Crouching Tiger, Hidden Dragon"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Tygr a drak",
+   "originaltitle": "Crouching Tiger, Hidden Dragon",
+   "year": "2000"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Tygr a drak",
+   "originaltitle": "卧虎藏龍",
+   "year": "2000",
+   "imdb_id": "tt0190332",
+   "tmdb_id": "146"
+  },
+  "pool_size": 151
+ },
+ {
+  "id": "toy_story_3",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:10193",
+   "cs": "Toy Story 3: Příběh hraček",
+   "original": "Toy Story 3",
+   "original_language": "en",
+   "english": "Toy Story 3",
+   "year": "2010",
+   "imdb_id": "tt0435761",
+   "addon_title": "Toy Story 3: Příběh hraček",
+   "addon_original_title": "Toy Story 3"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Toy Story 3: Příběh hraček",
+   "originaltitle": "Toy Story 3",
+   "year": "2010"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Toy Story 3: Příběh hraček",
+   "originaltitle": "Toy Story 3",
+   "year": "2010",
+   "imdb_id": "tt0435761",
+   "tmdb_id": "10193"
+  },
+  "pool_size": 72
+ },
+ {
+  "id": "total_recall_2012",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:64635",
+   "cs": "Total Recall",
+   "original": "Total Recall",
+   "original_language": "en",
+   "english": "Total Recall",
+   "year": "2012",
+   "imdb_id": "tt1386703",
+   "addon_title": "Total Recall",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Total Recall",
+   "originaltitle": "",
+   "year": "2012"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Total Recall",
+   "originaltitle": "Total Recall",
+   "year": "2012",
+   "imdb_id": "tt1386703",
+   "tmdb_id": "64635"
+  },
+  "pool_size": 52
+ },
+ {
+  "id": "ghostbusters_2016",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:43074",
+   "cs": "Krotitelé duchů",
+   "original": "Ghostbusters",
+   "original_language": "en",
+   "english": "Ghostbusters",
+   "year": "2016",
+   "imdb_id": "tt1289401",
+   "addon_title": "Krotitelé duchů",
+   "addon_original_title": "Ghostbusters"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Krotitelé duchů",
+   "originaltitle": "Ghostbusters",
+   "year": "2016"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Krotitelé duchů",
+   "originaltitle": "Ghostbusters",
+   "year": "2016",
+   "imdb_id": "tt1289401",
+   "tmdb_id": "43074"
+  },
+  "pool_size": 87
+ },
+ {
+  "id": "basnici_nadeje",
+  "type": "movie",
+  "category": "sequel_remake",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:84049",
+   "cs": "Jak básníci neztrácejí naději",
+   "original": "Jak básníci neztrácejí naději",
+   "original_language": "cs",
+   "english": "The Poets Never Lose Hope",
+   "year": "2004",
+   "imdb_id": "tt0399216",
+   "addon_title": "Jak básníci neztrácejí naději",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Jak básníci neztrácejí naději",
+   "originaltitle": "",
+   "year": "2004"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Jak básníci neztrácejí naději",
+   "originaltitle": "Jak básníci neztrácejí naději",
+   "year": "2004",
+   "imdb_id": "tt0399216",
+   "tmdb_id": "84049"
+  },
+  "pool_size": 104
+ },
+ {
+  "id": "hp_azkaban",
+  "type": "movie",
+  "category": "long_subtitle",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "movie:673",
+   "cs": "Harry Potter a vězeň z Azkabanu",
+   "original": "Harry Potter and the Prisoner of Azkaban",
+   "original_language": "en",
+   "english": "Harry Potter and the Prisoner of Azkaban",
+   "year": "2004",
+   "imdb_id": "tt0304141",
+   "addon_title": "Harry Potter a vězeň z Azkabanu",
+   "addon_original_title": "Harry Potter and the Prisoner of Azkaban"
+  },
+  "match": {
+   "mediatype": "movie",
+   "title": "Harry Potter a vězeň z Azkabanu",
+   "originaltitle": "Harry Potter and the Prisoner of Azkaban",
+   "year": "2004"
+  },
+  "tmdbh_params": {
+   "mediatype": "movie",
+   "title": "Harry Potter a vězeň z Azkabanu",
+   "originaltitle": "Harry Potter and the Prisoner of Azkaban",
+   "year": "2004",
+   "imdb_id": "tt0304141",
+   "tmdb_id": "673"
+  },
+  "pool_size": 78
+ },
+ {
+  "id": "nemocnice_s01e03",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:16088",
+   "show_cs": "Nemocnice na kraji města",
+   "show_original": "Nemocnice na kraji města",
+   "original_language": "cs",
+   "show_english": "",
+   "show_year": "1978",
+   "season": 1,
+   "episode": 3,
+   "episode_title": "Spor",
+   "episode_title_en": "Episode 3",
+   "air_date": "1978-11-19",
+   "addon_title": "Nemocnice na kraji města",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Nemocnice na kraji města",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 3,
+   "episode_title": "Spor"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Nemocnice na kraji města",
+   "tvshowtitle": "Nemocnice na kraji města",
+   "show_originaltitle": "Nemocnice na kraji města",
+   "season": "1",
+   "episode": "3",
+   "episode_title": "Spor",
+   "aired": "1978-11-19",
+   "year": "1978",
+   "imdb_id": "",
+   "tmdb_id": "16088"
+  },
+  "pool_size": 61
+ },
+ {
+  "id": "zena_za_pultem_s01e02",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:74889",
+   "show_cs": "Žena za pultem",
+   "show_original": "Žena za pultem",
+   "original_language": "cs",
+   "show_english": "",
+   "show_year": "1977",
+   "season": 1,
+   "episode": 2,
+   "episode_title": "Příběh zeleninové Jiřinky",
+   "episode_title_en": "Episode 2",
+   "air_date": "1977-12-13",
+   "addon_title": "Žena za pultem",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Žena za pultem",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 2,
+   "episode_title": "Příběh zeleninové Jiřinky"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Žena za pultem",
+   "tvshowtitle": "Žena za pultem",
+   "show_originaltitle": "Žena za pultem",
+   "season": "1",
+   "episode": "2",
+   "episode_title": "Příběh zeleninové Jiřinky",
+   "aired": "1977-12-13",
+   "year": "1977",
+   "imdb_id": "",
+   "tmdb_id": "74889"
+  },
+  "pool_size": 60
+ },
+ {
+  "id": "zdivocela_zeme_s01e01",
+  "type": "episode",
+  "category": "episode_czech",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:77644",
+   "show_cs": "Zdivočelá země",
+   "show_original": "Zdivočelá země",
+   "original_language": "cs",
+   "show_english": "",
+   "show_year": "1997",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Díl první - červen 1945",
+   "episode_title_en": "Episode 1",
+   "air_date": "1997-01-01",
+   "addon_title": "Zdivočelá země",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Zdivočelá země",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Díl první - červen 1945"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Zdivočelá země",
+   "tvshowtitle": "Zdivočelá země",
+   "show_originaltitle": "Zdivočelá země",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Díl první - červen 1945",
+   "aired": "1997-01-01",
+   "year": "1997",
+   "imdb_id": "",
+   "tmdb_id": "77644"
+  },
+  "pool_size": 92
+ },
+ {
+  "id": "shameless_us_s03e05",
+  "type": "episode",
+  "category": "episode_same_name",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:34307",
+   "show_cs": "Hříšníci",
+   "show_original": "Shameless",
+   "original_language": "en",
+   "show_english": "Shameless",
+   "show_year": "2011",
+   "season": 3,
+   "episode": 5,
+   "episode_title": "5. epizoda",
+   "episode_title_en": "The Sins of My Caretaker",
+   "air_date": "2013-02-17",
+   "addon_title": "Hříšníci",
+   "addon_original_title": "Shameless"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Hříšníci",
+   "show_originaltitle": "Shameless",
+   "season": 3,
+   "episode": 5,
+   "episode_title": "5. epizoda"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Hříšníci",
+   "tvshowtitle": "Hříšníci",
+   "show_originaltitle": "Shameless",
+   "season": "3",
+   "episode": "5",
+   "episode_title": "5. epizoda",
+   "aired": "2013-02-17",
+   "year": "2013",
+   "imdb_id": "",
+   "tmdb_id": "34307"
+  },
+  "pool_size": 207
+ },
+ {
+  "id": "the_office_us_s02e01",
+  "type": "episode",
+  "category": "episode_same_name",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:2316",
+   "show_cs": "Kancl",
+   "show_original": "The Office",
+   "original_language": "en",
+   "show_english": "The Office",
+   "show_year": "2005",
+   "season": 2,
+   "episode": 1,
+   "episode_title": "Oskaři",
+   "episode_title_en": "The Dundies",
+   "air_date": "2005-09-20",
+   "addon_title": "Kancl",
+   "addon_original_title": "The Office"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Kancl",
+   "show_originaltitle": "The Office",
+   "season": 2,
+   "episode": 1,
+   "episode_title": "Oskaři"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Kancl",
+   "tvshowtitle": "Kancl",
+   "show_originaltitle": "The Office",
+   "season": "2",
+   "episode": "1",
+   "episode_title": "Oskaři",
+   "aired": "2005-09-20",
+   "year": "2005",
+   "imdb_id": "",
+   "tmdb_id": "2316"
+  },
+  "pool_size": 227
+ },
+ {
+  "id": "house_of_cards_s01e01",
+  "type": "episode",
+  "category": "episode_same_name",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:1425",
+   "show_cs": "Dům z karet",
+   "show_original": "House of Cards",
+   "original_language": "en",
+   "show_english": "House of Cards",
+   "show_year": "2013",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. kapitola",
+   "episode_title_en": "Chapter 1",
+   "air_date": "2013-02-01",
+   "addon_title": "Dům z karet",
+   "addon_original_title": "House of Cards"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Dům z karet",
+   "show_originaltitle": "House of Cards",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. kapitola"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Dům z karet",
+   "tvshowtitle": "Dům z karet",
+   "show_originaltitle": "House of Cards",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "1. kapitola",
+   "aired": "2013-02-01",
+   "year": "2013",
+   "imdb_id": "",
+   "tmdb_id": "1425"
+  },
+  "pool_size": 158
+ },
+ {
+  "id": "doctor_who_s01e01",
+  "type": "episode",
+  "category": "episode_same_name",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:57243",
+   "show_cs": "Pán času",
+   "show_original": "Doctor Who",
+   "original_language": "en",
+   "show_english": "Doctor Who",
+   "show_year": "2005",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Rose",
+   "episode_title_en": "Rose",
+   "air_date": "2005-03-26",
+   "addon_title": "Pán času",
+   "addon_original_title": "Doctor Who"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Pán času",
+   "show_originaltitle": "Doctor Who",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Rose"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Pán času",
+   "tvshowtitle": "Pán času",
+   "show_originaltitle": "Doctor Who",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Rose",
+   "aired": "2005-03-26",
+   "year": "2005",
+   "imdb_id": "",
+   "tmdb_id": "57243"
+  },
+  "pool_size": 228
+ },
+ {
+  "id": "kingdom_s01e01",
+  "type": "episode",
+  "category": "episode_non_latin",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:70593",
+   "show_cs": "Království zombie",
+   "show_original": "킹덤",
+   "original_language": "ko",
+   "show_english": "Kingdom",
+   "show_year": "2019",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. epizoda",
+   "episode_title_en": "Episode 1",
+   "air_date": "2019-01-25",
+   "addon_title": "Království zombie",
+   "addon_original_title": "Kingdom"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Království zombie",
+   "show_originaltitle": "Kingdom",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. epizoda"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Království zombie",
+   "tvshowtitle": "Království zombie",
+   "show_originaltitle": "킹덤",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "1. epizoda",
+   "aired": "2019-01-25",
+   "year": "2019",
+   "imdb_id": "",
+   "tmdb_id": "70593"
+  },
+  "pool_size": 261
+ },
+ {
+  "id": "death_note_s01e01",
+  "type": "episode",
+  "category": "episode_non_latin",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:13916",
+   "show_cs": "Zápisník smrti",
+   "show_original": "DEATH NOTE",
+   "original_language": "ja",
+   "show_english": "Death Note",
+   "show_year": "2006",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Znovuzrození",
+   "episode_title_en": "Rebirth",
+   "air_date": "2006-10-04",
+   "addon_title": "Zápisník smrti",
+   "addon_original_title": "DEATH NOTE"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Zápisník smrti",
+   "show_originaltitle": "DEATH NOTE",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Znovuzrození"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Zápisník smrti",
+   "tvshowtitle": "Zápisník smrti",
+   "show_originaltitle": "DEATH NOTE",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Znovuzrození",
+   "aired": "2006-10-04",
+   "year": "2006",
+   "imdb_id": "",
+   "tmdb_id": "13916"
+  },
+  "pool_size": 189
+ },
+ {
+  "id": "the_glory_s01e01",
+  "type": "episode",
+  "category": "episode_non_latin",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:136283",
+   "show_cs": "Sláva",
+   "show_original": "더 글로리",
+   "original_language": "ko",
+   "show_english": "The Glory",
+   "show_year": "2022",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. díl",
+   "episode_title_en": "Episode 1",
+   "air_date": "2022-12-30",
+   "addon_title": "Sláva",
+   "addon_original_title": "The Glory"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Sláva",
+   "show_originaltitle": "The Glory",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "1. díl"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Sláva",
+   "tvshowtitle": "Sláva",
+   "show_originaltitle": "더 글로리",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "1. díl",
+   "aired": "2022-12-30",
+   "year": "2022",
+   "imdb_id": "",
+   "tmdb_id": "136283"
+  },
+  "pool_size": 334
+ },
+ {
+  "id": "sopranos_s02e03",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:1398",
+   "show_cs": "Rodina Sopránů",
+   "show_original": "The Sopranos",
+   "original_language": "en",
+   "show_english": "The Sopranos",
+   "show_year": "1999",
+   "season": 2,
+   "episode": 3,
+   "episode_title": "Pápá",
+   "episode_title_en": "Toodle-Fucking-Oo",
+   "air_date": "2000-01-30",
+   "addon_title": "Rodina Sopránů",
+   "addon_original_title": "The Sopranos"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Rodina Sopránů",
+   "show_originaltitle": "The Sopranos",
+   "season": 2,
+   "episode": 3,
+   "episode_title": "Pápá"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Rodina Sopránů",
+   "tvshowtitle": "Rodina Sopránů",
+   "show_originaltitle": "The Sopranos",
+   "season": "2",
+   "episode": "3",
+   "episode_title": "Pápá",
+   "aired": "2000-01-30",
+   "year": "2000",
+   "imdb_id": "",
+   "tmdb_id": "1398"
+  },
+  "pool_size": 138
+ },
+ {
+  "id": "sherlock_s01e01",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:19885",
+   "show_cs": "Sherlock",
+   "show_original": "Sherlock",
+   "original_language": "en",
+   "show_english": "Sherlock",
+   "show_year": "2010",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Studie v růžové",
+   "episode_title_en": "A Study in Pink",
+   "air_date": "2010-07-25",
+   "addon_title": "Sherlock",
+   "addon_original_title": ""
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Sherlock",
+   "show_originaltitle": "",
+   "season": 1,
+   "episode": 1,
+   "episode_title": "Studie v růžové"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Sherlock",
+   "tvshowtitle": "Sherlock",
+   "show_originaltitle": "Sherlock",
+   "season": "1",
+   "episode": "1",
+   "episode_title": "Studie v růžové",
+   "aired": "2010-07-25",
+   "year": "2010",
+   "imdb_id": "",
+   "tmdb_id": "19885"
+  },
+  "pool_size": 117
+ },
+ {
+  "id": "chernobyl_s01e02",
+  "type": "episode",
+  "category": "episode_foreign_cs",
+  "split": "holdout",
+  "metadata": {
+   "tmdb_id": "tv:87108",
+   "show_cs": "Černobyl",
+   "show_original": "Chernobyl",
+   "original_language": "en",
+   "show_english": "Chernobyl",
+   "show_year": "2019",
+   "season": 1,
+   "episode": 2,
+   "episode_title": "2. díl",
+   "episode_title_en": "Please Remain Calm",
+   "air_date": "2019-05-13",
+   "addon_title": "Černobyl",
+   "addon_original_title": "Chernobyl"
+  },
+  "match": {
+   "mediatype": "episode",
+   "showname": "Černobyl",
+   "show_originaltitle": "Chernobyl",
+   "season": 1,
+   "episode": 2,
+   "episode_title": "2. díl"
+  },
+  "tmdbh_params": {
+   "mediatype": "episode",
+   "showname": "Černobyl",
+   "tvshowtitle": "Černobyl",
+   "show_originaltitle": "Chernobyl",
+   "season": "1",
+   "episode": "2",
+   "episode_title": "2. díl",
+   "aired": "2019-05-13",
+   "year": "2019",
+   "imdb_id": "",
+   "tmdb_id": "87108"
+  },
+  "pool_size": 192
+ }
+]

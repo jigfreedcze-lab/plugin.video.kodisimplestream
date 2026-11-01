@@ -49,6 +49,18 @@ def test_settings_ids_unique():
     assert len(ids) == len(set(ids)), ids
 
 
+
+def test_tmdbhelper_player_uses_known_keys():
+    """TMDb Helper fills unknown keys with "_" ({tmdb_id}, {show_originaltitle} do not exist, see
+    tmdbhelper/lib/player/details.py set_detailed_item): only keys it sets."""
+    import json, re
+    player = json.load(open(os.path.join(REPO, "docs", "tmdbhelper", "kodisimplestream.json"), encoding="utf-8"))
+    known = {"title", "originaltitle", "year", "imdb", "tmdb", "showname", "tvshowtitle", "season", "episode", "premiered"}
+    for key in ("play_movie", "play_episode"):
+        used = set(re.findall(r"{(\w+)}", player[key]))
+        assert used <= known, (key, sorted(used - known))
+    assert "show_originaltitle={originaltitle}" in player["play_episode"] and "tmdb_id={tmdb}" in player["play_episode"]
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

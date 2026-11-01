@@ -175,6 +175,12 @@ def run_flow_b(repo: Repo, case: Dict[str, Any], cache: Cache, preference: str,
     """search_and_score_tmdbh without the Kodi parts."""
     params = {str(k): str(v) for k, v in case["tmdbh_params"].items()}
     matching, source_ui = repo.matching, repo.source_ui
+    # The add-on looks up the English title on TMDb when the original is in another script (tmdbh_play);
+    # older versions of the add-on do not
+    key = matching.english_title_key(params) if hasattr(matching, "english_title_key") else ""
+    english = case["metadata"].get("show_english" if case["type"] == "episode" else "english") or ""
+    if key and english:
+        params[key] = english
     queries = [str(q) for q in matching.build_tmdbh_queries(params)]
     mediatype = (params.get("mediatype") or "movie").lower()
     merged: Dict[str, Dict[str, Any]] = {}

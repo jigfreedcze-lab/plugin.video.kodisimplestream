@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Builds the benchmark data: python -X utf8 tools/benchmark/build_benchmark.py [--repo <repo>] {tmdb|fetch|finalize|all}
+"""Builds the benchmark data: python -X utf8 tools/benchmark/build_benchmark.py [--repo <repo>] [--set main|holdout2]
+{tmdb|fetch|finalize|all}
 
 tmdb      - case metadata from TMDb (resources/lib/tmdb.py of the repo) -> cases_meta.json
 fetch     - Webshare results for all query variants -> cache/<id>.json (resumable)
@@ -82,6 +83,9 @@ FIXED_IDS = {
     "parazit": "movie:496243",
     "your_name": "movie:372058",
     "attack_on_titan_s01e01": "tv:1429",
+    "tygr_a_drak": "movie:146",
+    "kingdom_s01e01": "tv:70593",
+    "the_glory_s01e01": "tv:136283",
 }
 
 # (id, category, TMDb search query, first air year, season, episode)
@@ -136,6 +140,53 @@ def is_latin(text: str) -> bool:
 
 def colon_prefix(text: str) -> str:
     return text.split(":", 1)[0].strip() if text and ":" in text else ""
+
+
+# Second holdout (issue #6), built after the ranking changes of that issue and never tuned on: harder cases of
+# the weak categories. Its own files (see SETS), split "holdout" for all cases.
+HOLDOUT2_MOVIES = [
+    ("pelisky", "cz_movie", "Pelíšky", 1999),
+    ("obecna_skola", "cz_movie", "Obecná škola", 1991),
+    ("ted_2012", "short_title", "Ted", 2012),
+    ("elf_2003", "short_title", "Elf", 2003),
+    ("saw_2004", "short_title", "Saw", 2004),
+    ("nope_2022", "short_title", "Nope", 2022),
+    ("heat_1995", "short_title", "Heat", 1995),
+    ("oldboy_2003", "non_latin_movie", "Oldboy", 2003),
+    ("akira_1988", "non_latin_movie", "Akira", 1988),
+    ("princezna_mononoke", "non_latin_movie", "Princess Mononoke", 1997),
+    ("zamek_v_oblacich", "non_latin_movie", "Howl's Moving Castle", 2004),
+    ("tygr_a_drak", "non_latin_movie", "Crouching Tiger, Hidden Dragon", 2000),
+    ("toy_story_3", "sequel_remake", "Toy Story 3", 2010),
+    ("total_recall_2012", "sequel_remake", "Total Recall", 2012),
+    ("ghostbusters_2016", "sequel_remake", "Ghostbusters", 2016),
+    ("basnici_nadeje", "sequel_remake", "Jak básníci neztrácejí naději", 2004),
+    ("hp_azkaban", "long_subtitle", "Harry Potter and the Prisoner of Azkaban", 2004),
+]
+HOLDOUT2_EPISODES = [
+    ("nemocnice_s01e03", "episode_czech", "Nemocnice na kraji města", 1977, 1, 3),
+    ("zena_za_pultem_s01e02", "episode_czech", "Žena za pultem", 1977, 1, 2),
+    ("chalupari_s01e04", "episode_czech", "Chalupáři", 1975, 1, 4),
+    ("zdivocela_zeme_s01e01", "episode_czech", "Zdivočelá země", 1997, 1, 1),
+    ("shameless_us_s03e05", "episode_same_name", "Shameless", 2011, 3, 5),
+    ("the_office_us_s02e01", "episode_same_name", "The Office", 2005, 2, 1),
+    ("house_of_cards_s01e01", "episode_same_name", "House of Cards", 2013, 1, 1),
+    ("doctor_who_s01e01", "episode_same_name", "Doctor Who", 2005, 1, 1),
+    ("kingdom_s01e01", "episode_non_latin", "Kingdom", 2019, 1, 1),
+    ("death_note_s01e01", "episode_non_latin", "Death Note", 2006, 1, 1),
+    ("the_glory_s01e01", "episode_non_latin", "The Glory", 2022, 1, 1),
+    ("sopranos_s02e03", "episode_foreign_cs", "The Sopranos", 1999, 2, 3),
+    ("sherlock_s01e01", "episode_foreign_cs", "Sherlock", 2010, 1, 1),
+    ("chernobyl_s01e02", "episode_foreign_cs", "Chernobyl", 2019, 1, 2),
+]
+
+# Files of a case set: TMDb metadata and excluded cases in the snapshot, case definitions next to this script
+SETS = {
+    "main": {"movies": MOVIES, "episodes": EPISODES, "meta": "cases_meta.json", "excluded": "excluded.json",
+             "cases": "cases.json"},
+    "holdout2": {"movies": HOLDOUT2_MOVIES, "episodes": HOLDOUT2_EPISODES, "meta": "cases_meta_holdout2.json",
+                 "excluded": "excluded_holdout2.json", "cases": "cases_holdout2.json"},
+}
 
 
 def read_api_key() -> str:
@@ -197,7 +248,7 @@ def pick(results: List[Dict], year: int, kind_label: str, query: str) -> Dict:
     raise RuntimeError(f"No TMDb {kind_label} result for {query!r} ({year})")
 
 
-def stage_tmdb(repo: str) -> None:
+def stage_tmdb(repo: str, case_set: Dict[str, Any]) -> None:
     _, tmdb_module = import_repo(repo)
     key = read_api_key()
     if not key:
@@ -206,7 +257,7 @@ def stage_tmdb(repo: str) -> None:
     del key
     cases = []
 
-    for cid, category, query, year in MOVIES:
+    for cid, category, query, year in case_set["movies"]:
         full_id = FIXED_IDS.get(cid) or pick(client.search(query, type="movie"), year, "movie", query)["id"]
         details = client.get_detail(full_id)
         raw = client._details[full_id]
@@ -243,7 +294,7 @@ def stage_tmdb(repo: str) -> None:
         print(f"{cid:28} {full_id:14} {meta['cs']} | {meta['original']} | {english} | {movie_year}"
               f"  -> addon: {details['title']} | {details.get('original_title')}")
 
-    for cid, category, query, year, season, episode in EPISODES:
+    for cid, category, query, year, season, episode in case_set["episodes"]:
         full_id = FIXED_IDS.get(cid) or pick(client.search(query, type="series"), year, "series", query)["id"]
         details = client.get_detail(full_id)
         raw = client._details[full_id]
@@ -299,7 +350,7 @@ def stage_tmdb(repo: str) -> None:
               f"S{season:02d}E{episode:02d} {ep_cs['title']} / {meta['episode_title_en']}"
               f"  -> addon: {details['title']} | {details.get('original_title')}")
 
-    jdump(os.path.join(BENCH, "cases_meta.json"), cases)
+    jdump(os.path.join(BENCH, case_set["meta"]), cases)
     print(f"{len(cases)} cases written")
 
 
@@ -386,9 +437,9 @@ def ws_search(query: str, offset: int) -> Dict[str, Any]:
     return {"status": "ERROR", "error": last_error, "total": 0, "files": []}
 
 
-def stage_fetch(repo: str) -> None:
+def stage_fetch(repo: str, case_set: Dict[str, Any]) -> None:
     matching, _ = import_repo(repo)
-    cases = jload(os.path.join(BENCH, "cases_meta.json"))
+    cases = jload(os.path.join(BENCH, case_set["meta"]))
     for index, case in enumerate(cases, 1):
         path = os.path.join(BENCH, "cache", f"{case['id']}.json")
         cache = jload(path) if os.path.exists(path) else {"id": case["id"], "sort": "", "limit": PAGE, "queries": {}}
@@ -407,8 +458,8 @@ def stage_fetch(repo: str) -> None:
         print(f"[{index}/{len(cases)}] {case['id']}: {len(jobs)} requests ({new} new) -> {counts}", flush=True)
 
 
-def stage_finalize() -> None:
-    cases = jload(os.path.join(BENCH, "cases_meta.json"))
+def stage_finalize(case_set: Dict[str, Any]) -> None:
+    cases = jload(os.path.join(BENCH, case_set["meta"]))
     kept, excluded = [], []
     for case in cases:
         meta = case["metadata"]
@@ -451,14 +502,14 @@ def stage_finalize() -> None:
         by_category.setdefault(case["category"], []).append(case)
     for members in by_category.values():
         members.sort(key=lambda c: hashlib.sha1(c["id"].encode("utf-8")).hexdigest())
-        holdout = int(len(members) * HOLDOUT_SHARE + 0.5)
+        holdout = len(members) if case_set is not SETS["main"] else int(len(members) * HOLDOUT_SHARE + 0.5)
         for position, case in enumerate(members):
             case["split"] = "holdout" if position < holdout else "train"
 
     ordered = [{key: case[key] for key in ("id", "type", "category", "split", "metadata", "match", "tmdbh_params", "pool_size")}
                for case in kept]
-    jdump(os.path.join(HERE, "cases.json"), ordered)
-    jdump(os.path.join(BENCH, "excluded.json"), excluded)
+    jdump(os.path.join(HERE, case_set["cases"]), ordered)
+    jdump(os.path.join(BENCH, case_set["excluded"]), excluded)
     train = sum(1 for c in ordered if c["split"] == "train")
     print(f"kept {len(ordered)} (train {train}, holdout {len(ordered) - train}), excluded {len(excluded)}")
     for item in excluded:
@@ -468,14 +519,17 @@ def stage_finalize() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=REPO_ROOT)
+    parser.add_argument("--set", choices=sorted(SETS), default="main",
+                        help="holdout2: the second holdout of issue #6 (its own files, all cases holdout)")
     parser.add_argument("stage", choices=["tmdb", "fetch", "finalize", "all"])
     args = parser.parse_args()
+    case_set = SETS[args.set]
     if args.stage in ("tmdb", "all"):
-        stage_tmdb(args.repo)
+        stage_tmdb(args.repo, case_set)
     if args.stage in ("fetch", "all"):
-        stage_fetch(args.repo)
+        stage_fetch(args.repo, case_set)
     if args.stage in ("finalize", "all"):
-        stage_finalize()
+        stage_finalize(case_set)
 
 
 if __name__ == "__main__":

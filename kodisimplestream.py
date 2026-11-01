@@ -37,6 +37,7 @@ from resources.lib.source_ui import (
     source_title_label,
 )
 from resources.lib.matching import (
+    english_title_key,
     LANG_PREF_BONUS,
     autoplay_concern,
     build_search_queries,
@@ -1428,7 +1429,54 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
     select_tmdbh_source(params, results, cache, fetcher)
 
 
+# English titles looked up for TMDb Helper, one window property per TMDb id for the whole Kodi session
+ENGLISH_TITLE_PROPERTY = "kodisimplestream.en."
+ENGLISH_TITLE_TIMEOUT = 3.0
+ENGLISH_TITLE_RETRY = 300  # seconds after a failed lookup (no connection)
+
+
+def _add_english_title(params: Dict[str, Any]) -> None:
+    """TMDb Helper passes no English title. For an original in another script (Japanese, Korean...) the
+    files on Webshare go by the English one: look it up once per title and session on TMDb, with a short
+    timeout; without a TMDb API key, without a TMDb id or on an error the search goes on without it."""
+    key = english_title_key(params)
+    tmdb_id = str(params.get("tmdb_id") or "").strip()
+    if not key or not tmdb_id.isdigit():
+        return
+    full_id = f"{'tv' if (params.get('mediatype') or '').lower() == 'episode' else 'movie'}:{tmdb_id}"
+    home = _home()
+    prop = ENGLISH_TITLE_PROPERTY + full_id
+    english = home.getProperty(prop) if home else ""
+    if english.startswith("!"):  # a failed lookup: not again for a while, every try may wait the timeout
+        try:
+            if time.time() - float(english[1:]) < ENGLISH_TITLE_RETRY:
+                return
+        except ValueError:
+            pass
+        english = ""
+    if not english:
+        try:
+            client = TMDB(_addon.getSetting("tmdb_api_key"), timeout=ENGLISH_TITLE_TIMEOUT)
+        except ValueError:
+            return  # no key: an optional part of the add-on
+        try:
+            english = client.english_title(full_id) or "-"
+        except TMDBAuthError:
+            english = "-"  # a wrong key does not fix itself in this session
+        except Exception as exc:
+            xbmc.log(f"[KodiSimpleStream] English title of {full_id} unavailable: {type(exc).__name__}", xbmc.LOGINFO)
+            if home:
+                home.setProperty(prop, f"!{time.time()}")
+            return
+        if home:
+            home.setProperty(prop, english)
+    if english != "-":
+        params[key] = english
+
+
 def tmdbh_play(params: Dict[str, Any]) -> None:
+    # TMDb Helper fills keys it does not know with "_"
+    params = {key: value for key, value in params.items() if value != "_"}
     queries = build_tmdbh_queries(params)
     if not queries:
         xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "Missing required metadata for TMDb Helper search", xbmcgui.NOTIFICATION_ERROR, 4000)
@@ -1440,6 +1488,7 @@ def tmdbh_play(params: Dict[str, Any]) -> None:
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
 
+    _add_english_title(params)
     if _addon.getSettingBool("tmdbh_auto_play_best"):
         play_best_tmdbh_source(params)
     else:

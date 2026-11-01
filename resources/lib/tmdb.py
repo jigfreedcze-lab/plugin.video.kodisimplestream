@@ -18,7 +18,7 @@ class TMDB:
     BASE_URL = "https://api.themoviedb.org/3/"
     IMAGE_URL = "https://image.tmdb.org/t/p/w500"
 
-    def __init__(self, api_key: str, language: str = "cs-CZ"):
+    def __init__(self, api_key: str, language: str = "cs-CZ", timeout: float = 15):
         # Users often copy the v4 token including the "Bearer " prefix
         parts = (api_key or "").split(None, 1)
         if parts and parts[0].lower() == "bearer":
@@ -28,6 +28,7 @@ class TMDB:
             raise ValueError("TMDb API key is not set")
         self._api_key = api_key
         self._language = language
+        self._timeout = timeout
         # tv/{id} downloaded by get_detail() also contains seasons – reuse it in get_seasons()
         self._details: Dict[str, Dict] = {}
 
@@ -39,7 +40,7 @@ class TMDB:
             headers["Authorization"] = f"Bearer {self._api_key}"
         else:
             params["api_key"] = self._api_key
-        response = requests.get(self.BASE_URL + path, params=params, headers=headers, timeout=15)
+        response = requests.get(self.BASE_URL + path, params=params, headers=headers, timeout=self._timeout)
         if response.status_code == 401:
             raise TMDBAuthError("TMDb rejected the API key")
         if response.status_code >= 400:
@@ -91,6 +92,11 @@ class TMDB:
             if title:
                 return title
         return ""
+
+    def english_title(self, full_id: str) -> str:
+        """English title of a movie or series ("movie:372058", "tv:1429"), "" without an English translation."""
+        kind, tmdb_id = self._split_id(full_id)
+        return self._english_title({"translations": self._get(f"{kind}/{tmdb_id}/translations")})
 
     def get_detail(self, full_id: str) -> Dict:
         kind, tmdb_id = self._split_id(full_id)

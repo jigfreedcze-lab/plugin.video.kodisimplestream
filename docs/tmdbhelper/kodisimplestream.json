@@ -13,6 +13,6 @@
       "episode"
     ]
   },
-  "play_movie": "plugin://plugin.video.kodisimplestream/?action=tmdbh_play&mediatype=movie&title={title}&originaltitle={originaltitle}&year={year}&imdb_id={imdb_id}&tmdb_id={tmdb_id}",
-  "play_episode": "plugin://plugin.video.kodisimplestream/?action=tmdbh_play&mediatype=episode&showname={showname}&tvshowtitle={tvshowtitle}&show_originaltitle={show_originaltitle}&season={season}&episode={episode}&episode_title={title}&aired={premiered}&year={year}&imdb_id={imdb_id}&tmdb_id={tmdb_id}"
+  "play_movie": "plugin://plugin.video.kodisimplestream/?action=tmdbh_play&mediatype=movie&title={title}&originaltitle={originaltitle}&year={year}&imdb_id={imdb}&tmdb_id={tmdb}",
+  "play_episode": "plugin://plugin.video.kodisimplestream/?action=tmdbh_play&mediatype=episode&showname={showname}&tvshowtitle={tvshowtitle}&show_originaltitle={originaltitle}&season={season}&episode={episode}&episode_title={title}&aired={premiered}&year={year}&imdb_id={imdb}&tmdb_id={tmdb}"
 }

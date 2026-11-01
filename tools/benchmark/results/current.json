@@ -1524,23 +1524,23 @@
     "by_split": {
      "all": {
       "n": 56,
-      "SCORE": 0.958,
-      "Top1": 0.9821,
-      "P@5": 0.925,
-      "MRR": 0.9821,
-      "R@10": 0.9429,
-      "Hit@10": 0.9821,
-      "queries": 3.2679
+      "SCORE": 0.9808,
+      "Top1": 1.0,
+      "P@5": 0.95,
+      "MRR": 1.0,
+      "R@10": 0.9732,
+      "Hit@10": 1.0,
+      "queries": 3.5
      },
      "train": {
       "n": 38,
-      "SCORE": 0.9395,
-      "Top1": 0.9737,
-      "P@5": 0.8947,
-      "MRR": 0.9737,
-      "R@10": 0.9158,
-      "Hit@10": 0.9737,
-      "queries": 3.3158
+      "SCORE": 0.973,
+      "Top1": 1.0,
+      "P@5": 0.9316,
+      "MRR": 1.0,
+      "R@10": 0.9605,
+      "Hit@10": 1.0,
+      "queries": 3.5526
      },
      "holdout": {
       "n": 18,
@@ -1550,7 +1550,7 @@
       "MRR": 1.0,
       "R@10": 1.0,
       "Hit@10": 1.0,
-      "queries": 3.1667
+      "queries": 3.3889
      }
     },
     "by_category": {
@@ -1586,13 +1586,13 @@
      },
      "episode_non_latin": {
       "n": 4,
-      "SCORE": 0.9313,
+      "SCORE": 0.9938,
       "Top1": 1.0,
-      "P@5": 0.9,
+      "P@5": 1.0,
       "MRR": 1.0,
-      "R@10": 0.825,
+      "R@10": 0.975,
       "Hit@10": 1.0,
-      "queries": 2.5
+      "queries": 3.25
      },
      "episode_other_lang": {
       "n": 3,
@@ -1636,13 +1636,13 @@
      },
      "non_latin_movie": {
       "n": 6,
-      "SCORE": 0.7958,
-      "Top1": 0.8333,
-      "P@5": 0.7667,
-      "MRR": 0.8333,
-      "R@10": 0.75,
-      "Hit@10": 0.8333,
-      "queries": 2.3333
+      "SCORE": 0.9667,
+      "Top1": 1.0,
+      "P@5": 0.9333,
+      "MRR": 1.0,
+      "R@10": 0.9333,
+      "Hit@10": 1.0,
+      "queries": 4.0
      },
      "sequel_remake": {
       "n": 8,
@@ -1945,9 +1945,11 @@
      "split": "train",
      "queries": [
       "Cesta do fantazie 2001",
-      "Cesta do fantazie"
+      "Cesta do fantazie",
+      "Spirited Away 2001",
+      "Spirited Away"
      ],
-     "n_queries": 2,
+     "n_queries": 4,
      "cache_misses": [],
      "n_results": 20,
      "n_relevant_pool": 44,
@@ -1960,7 +1962,7 @@
      "R@10": 1.0,
      "Hit@10": 1.0,
      "first_relevant_rank": 1,
-     "queries_metric": 2
+     "queries_metric": 4
     },
     {
      "id": "parazit",
@@ -1968,13 +1970,15 @@
      "split": "holdout",
      "queries": [
       "Parazit 2019",
-      "Parazit"
+      "Parazit",
+      "Parasite 2019",
+      "Parasite"
      ],
-     "n_queries": 2,
+     "n_queries": 4,
      "cache_misses": [],
      "n_results": 20,
      "n_relevant_pool": 39,
-     "n_relevant_found": 19,
+     "n_relevant_found": 20,
      "status": "scored",
      "SCORE": 1.0,
      "Top1": 1.0,
@@ -1983,7 +1987,7 @@
      "R@10": 1.0,
      "Hit@10": 1.0,
      "first_relevant_rank": 1,
-     "queries_metric": 2
+     "queries_metric": 4
     },
     {
      "id": "your_name",
@@ -1991,22 +1995,24 @@
      "split": "train",
      "queries": [
       "Tvoje jméno. 2016",
-      "Tvoje jméno."
+      "Tvoje jméno.",
+      "Your Name. 2016",
+      "Your Name."
      ],
-     "n_queries": 2,
+     "n_queries": 4,
      "cache_misses": [],
      "n_results": 20,
      "n_relevant_pool": 21,
-     "n_relevant_found": 0,
+     "n_relevant_found": 16,
      "status": "scored",
-     "SCORE": 0.0,
-     "Top1": 0.0,
-     "P@5": 0.0,
-     "MRR": 0.0,
-     "R@10": 0.0,
-     "Hit@10": 0.0,
-     "first_relevant_rank": 0,
-     "queries_metric": 2
+     "SCORE": 1.0,
+     "Top1": 1.0,
+     "P@5": 1.0,
+     "MRR": 1.0,
+     "R@10": 1.0,
+     "Hit@10": 1.0,
+     "first_relevant_rank": 1,
+     "queries_metric": 4
     },
     {
      "id": "vlak_do_pusanu",
@@ -2014,12 +2020,39 @@
      "split": "holdout",
      "queries": [
       "Vlak do Busanu 2016",
-      "Vlak do Busanu"
+      "Vlak do Busanu",
+      "Train to Busan 2016",
+      "Train to Busan"
      ],
-     "n_queries": 2,
+     "n_queries": 4,
      "cache_misses": [],
      "n_results": 20,
      "n_relevant_pool": 29,
+     "n_relevant_found": 20,
+     "status": "scored",
+     "SCORE": 1.0,
+     "Top1": 1.0,
+     "P@5": 1.0,
+     "MRR": 1.0,
+     "R@10": 1.0,
+     "Hit@10": 1.0,
+     "first_relevant_rank": 1,
+     "queries_metric": 4
+    },
+    {
+     "id": "sedm_samuraju",
+     "category": "non_latin_movie",
+     "split": "train",
+     "queries": [
+      "Sedm samurajů 1954",
+      "Sedm samurajů",
+      "Seven Samurai 1954",
+      "Seven Samurai"
+     ],
+     "n_queries": 4,
+     "cache_misses": [],
+     "n_results": 20,
+     "n_relevant_pool": 10,
      "n_relevant_found": 10,
      "status": "scored",
      "SCORE": 1.0,
@@ -2029,30 +2062,7 @@
      "R@10": 1.0,
      "Hit@10": 1.0,
      "first_relevant_rank": 1,
-     "queries_metric": 2
-    },
-    {
-     "id": "sedm_samuraju",
-     "category": "non_latin_movie",
-     "split": "train",
-     "queries": [
-      "Sedm samurajů 1954",
-      "Sedm samurajů"
-     ],
-     "n_queries": 2,
-     "cache_misses": [],
-     "n_results": 20,
-     "n_relevant_pool": 10,
-     "n_relevant_found": 9,
-     "status": "scored",
-     "SCORE": 0.975,
-     "Top1": 1.0,
-     "P@5": 1.0,
-     "MRR": 1.0,
-     "R@10": 0.9,
-     "Hit@10": 1.0,
-     "first_relevant_rank": 1,
-     "queries_metric": 2
+     "queries_metric": 4
     },
     {
      "id": "moskva_slzam",
@@ -2992,10 +3002,11 @@
      "split": "train",
      "queries": [
       "Hra na oliheň S01E01",
+      "Squid Game S01E01",
       "Hra na oliheň Červená, zelená",
       "Hra na oliheň 1x01"
      ],
-     "n_queries": 3,
+     "n_queries": 4,
      "cache_misses": [],
      "n_results": 20,
      "n_relevant_pool": 43,
@@ -3008,7 +3019,7 @@
      "R@10": 1.0,
      "Hit@10": 1.0,
      "first_relevant_rank": 1,
-     "queries_metric": 3
+     "queries_metric": 4
     },
     {
      "id": "squid_game_s02e03",
@@ -3016,13 +3027,14 @@
      "split": "train",
      "queries": [
       "Hra na oliheň S02E03",
+      "Squid Game S02E03",
       "Hra na oliheň 2x03"
      ],
-     "n_queries": 2,
+     "n_queries": 3,
      "cache_misses": [],
      "n_results": 20,
      "n_relevant_pool": 31,
-     "n_relevant_found": 15,
+     "n_relevant_found": 20,
      "status": "scored",
      "SCORE": 1.0,
      "Top1": 1.0,
@@ -3031,7 +3043,7 @@
      "R@10": 1.0,
      "Hit@10": 1.0,
      "first_relevant_rank": 1,
-     "queries_metric": 2
+     "queries_metric": 3
     },
     {
      "id": "attack_on_titan_s01e01",
@@ -3039,23 +3051,24 @@
      "split": "train",
      "queries": [
       "Šingeki no kjodžin S01E01",
+      "Attack on Titan S01E01",
       "Šingeki no kjodžin Pád Šiganšiny, část 1 - Tobě, dva tisíce let poté",
       "Šingeki no kjodžin 1x01"
      ],
-     "n_queries": 3,
+     "n_queries": 4,
      "cache_misses": [],
      "n_results": 20,
      "n_relevant_pool": 10,
-     "n_relevant_found": 3,
+     "n_relevant_found": 9,
      "status": "scored",
-     "SCORE": 0.725,
+     "SCORE": 0.975,
      "Top1": 1.0,
-     "P@5": 0.6,
+     "P@5": 1.0,
      "MRR": 1.0,
-     "R@10": 0.3,
+     "R@10": 0.9,
      "Hit@10": 1.0,
      "first_relevant_rank": 1,
-     "queries_metric": 3
+     "queries_metric": 4
     },
     {
      "id": "alice_borderland_s01e01",

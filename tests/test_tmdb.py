@@ -78,3 +78,18 @@ assert t.get_detail("tv:1396")["runtime"] is None, "seriál: stopáž mají až 
 e = t.get_episodes("tv:1396", "1"); assert {x["number"]: x["runtime"] for x in e} == {1: None, 2: 47}, e
 assert len(calls) == n + 4
 print("3. kolo: stopáž OK")
+
+# --- 4. kolo: anglický název pro TMDb Helper (jen překlady, krátký timeout) ---
+FAKE["movie/129/translations"] = {"id": 129, "translations": [{"iso_639_1": "en", "iso_3166_1": "GB", "data": {"title": "Spirited Away (GB)"}},
+                                                             {"iso_639_1": "en", "iso_3166_1": "US", "data": {"title": "Spirited Away"}}]}
+FAKE["tv/1396/translations"] = {"id": 1396, "translations": [{"iso_639_1": "de", "data": {"name": "Breaking Bad"}}]}
+timeouts = []
+def timed_get(url, params=None, headers=None, timeout=None):
+    timeouts.append(timeout); return fake_get(url, params, headers, timeout)
+requests.get = timed_get
+quick = TMDB("0123456789abcdef0123456789abcdef", timeout=3)
+assert quick.english_title("movie:129") == "Spirited Away" and quick.english_title("tv:1396") == ""
+assert timeouts == [3, 3] and calls[-1][0] == "tv/1396/translations", (timeouts, calls[-1])
+assert t.get_detail("movie:999") and timeouts[-1] == 15, "výchozí timeout zůstává"
+requests.get = fake_get
+print("4. kolo: anglický název OK")

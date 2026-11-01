@@ -233,5 +233,77 @@ class RankTests(unittest.TestCase):
         self.assertEqual([r["ident"] for r in rank_files([pages[1][1:]], MOVIE, preference="cz_audio")], ["c", "d"])
 
 
+class EdgeCaseTests(unittest.TestCase):
+    """Edge cases of issue #6 (all invented names)."""
+
+    def test_short_title_not_inside_leetspeak(self):
+        short = {"mediatype": "movie", "title": "Ra", "year": "2019"}
+        self.assertLess(movie("K4ra73.2019.1080p.mkv", short), movie("Ra.2019.1080p.mkv", short) - 50)
+        # a word glued to a number still splits (Island2, 1Island)
+        self.assertGreater(movie("Zeleny.ostrov2.2015.mkv"), movie("Modra.reka.2015.mkv") + 40)
+
+    def test_dot_before_a_year_is_no_decimal_point(self):
+        self.assertEqual(movie("The.Green.Island.2.2017.1080p.mkv"), movie("The Green Island 2 2017 1080p.mkv"))
+        self.assertLess(movie("The.Green.Island.2.2017.1080p.mkv"), movie("The.Green.Island.2015.1080p.mkv") - 50)
+        # audio channels stay a decimal number, not a sequel
+        self.assertEqual(movie("The.Green.Island.2015.DD5.1.1080p.mkv"), movie("The.Green.Island.2015.1080p.mkv"))
+
+    def test_long_and_single_digit_episode_numbers(self):
+        self.assertEqual(parse_episode_tags("Show.S01E1001.mkv"), ({(1, 1001)}, set()))
+        self.assertEqual(parse_episode_tags("Show.1x2.mkv"), ({(1, 2)}, set()))
+        self.assertEqual(parse_episode_tags("Show.1x2-3.mkv"), ({(1, 2), (1, 3)}, set()))
+        self.assertEqual(parse_episode_tags("Show.S01E2019.mkv")[0], set())  # a year, not episode 2019
+        self.assertEqual(parse_episode_numbers("Show - E1001.mkv"), {1001})
+        self.assertEqual(parse_episode_numbers("Show - E2160p.mkv"), set())
+        self.assertGreater(episode("Ticha.reka.2x5.mkv"), episode("Ticha.reka.2x6.mkv") + 100)
+        # absolute numbers: four digits count, a resolution without "p" does not; 4x3 of a film is no episode
+        absolute = dict(SHOW, season="1", episode="1001")
+        self.assertGreater(episode("Ticha.reka.1001.mkv", absolute), episode("Ticha.reka.mkv", absolute) + 40)
+        self.assertEqual(episode("Ticha.reka.1080.mkv"), episode("Ticha.reka.mkv"))
+        self.assertEqual(movie("The.Green.Island.2015.4x3.mkv"), movie("The.Green.Island.2015.mkv"))
+
+    def test_one_word_episode_title_does_not_lift_another_show(self):
+        one_word = dict(SHOW, episode_title="Brána")
+        self.assertLess(episode("Jina.Show.S02E05.Brana.mkv", one_word), episode("S02E05 - Brana.mkv", one_word) - 40)
+        # a release group after the tag is no other show title
+        self.assertEqual(episode("S02E05.Brana.1080p.WEB.H264-XYZ.mkv", one_word), episode("S02E05.Brana.1080p.mkv", one_word))
+        # with the show title the episode title still counts
+        self.assertGreater(episode("Ticha.reka.S02E05.Brana.mkv", one_word), episode("Ticha.reka.S02E05.mkv", one_word))
+
+    def test_making_of_with_of_in_the_title(self):
+        lord = {"mediatype": "movie", "title": "Lord of Islands", "year": "2015"}
+        self.assertLess(movie("Lord.of.Islands.2015.Making.Of.mkv", lord), movie("Lord.of.Islands.2015.mkv", lord) - 50)
+        self.assertLess(movie("Lord.of.Islands.2015.Making-of.mkv", lord), movie("Lord.of.Islands.2015.mkv", lord) - 50)
+        making = {"mediatype": "movie", "title": "The Making of Islands", "year": "2015"}
+        self.assertGreater(movie("The.Making.of.Islands.2015.mkv", making), 80)
+
+
+class EnglishTitleTests(unittest.TestCase):
+    """TMDb Helper flow: the English title instead of an original in another script (issue #6)."""
+
+    def test_english_title_key(self):
+        from resources.lib.matching import english_title_key
+        self.assertEqual(english_title_key({"mediatype": "movie", "title": "Zelený ostrov", "originaltitle": "緑の島"}),
+                         "englishtitle")
+        self.assertEqual(english_title_key({"mediatype": "episode", "showname": "Tichá řeka", "show_originaltitle": "조용한 강"}),
+                         "show_englishtitle")
+        for params in ({"mediatype": "movie", "title": "Zelený ostrov", "originaltitle": "The Green Island"},
+                       {"mediatype": "movie", "title": "Zelený ostrov", "originaltitle": "Зелёный остров"},  # Cyrillic: transliterated
+                       {"mediatype": "movie", "title": "Zelený ostrov", "originaltitle": "緑の島", "englishtitle": "Green Island"},
+                       {"mediatype": "movie", "title": "Zelený ostrov"}):
+            self.assertEqual(english_title_key(params), "", params)
+
+    def test_queries_use_the_english_title(self):
+        movie_params = {"mediatype": "movie", "title": "Zelený ostrov", "originaltitle": "緑の島", "year": "2015"}
+        self.assertEqual(build_tmdbh_queries(dict(movie_params, englishtitle="The Green Island")),
+                         ["Zelený ostrov 2015", "Zelený ostrov", "The Green Island 2015", "The Green Island"])
+        self.assertEqual(build_tmdbh_queries(movie_params)[:2], ["Zelený ostrov 2015", "Zelený ostrov"])
+        latin = dict(movie_params, originaltitle="L'île verte", englishtitle="The Green Island")
+        self.assertEqual(build_tmdbh_queries(latin)[2:], ["L'île verte 2015", "L'île verte"])
+        show = {"mediatype": "episode", "showname": "Tichá řeka", "show_originaltitle": "조용한 강",
+                "show_englishtitle": "Silent River", "season": "1", "episode": "2"}
+        self.assertEqual(build_tmdbh_queries(show)[:2], ["Tichá řeka S01E02", "Silent River S01E02"])
+
+
 if __name__ == "__main__":
     unittest.main()

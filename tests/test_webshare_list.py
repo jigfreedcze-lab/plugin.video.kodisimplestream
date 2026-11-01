@@ -499,3 +499,40 @@ picks = [e for e in log if e[0] == "select"]
 assert len(picks) == 1 and rows(picks[0])[-1] == "#30077" and api.links[-1] == "G", (rows(picks[0]), api.links)
 Addon.settings.update(tmdbh_auto_play_best="", tmdbh_auto_play_min_score="", tmdbh_picker_min_score="0")
 print("minimální skóre ve výběru: OK")
+
+# 23. TMDb Helper: anglický název k originálu v jiném písmu (jednou za sezení, krátký timeout, bez klíče nic),
+#     zástupné "_" od TMDb Helperu se zahodí
+class FakeTMDB:
+    made, asked = [], []
+    def __init__(self, key, timeout=15):
+        if not key: raise ValueError("no key")
+        FakeTMDB.made.append(timeout)
+    def english_title(self, full_id):
+        FakeTMDB.asked.append(full_id)
+        if full_id == "movie:13": raise ConnectionError("down")
+        return {"movie:12": "The Green Island", "tv:7": "Silent River"}.get(full_id, "")
+real_tmdb = k.TMDB; k.TMDB = FakeTMDB; Window.props.clear()
+Addon.settings.update(tmdb_api_key="0123456789abcdef0123456789abcdef", tmdbh_auto_play_best="")
+api = FakeAPI({}); k.get_api = lambda: api
+jp = {"mediatype": "movie", "title": "Zelený ostrov", "originaltitle": "緑の島", "year": "2015", "tmdb_id": "12", "imdb_id": "_"}
+log.clear(); inputs[:] = [""]; k.tmdbh_play(jp)
+assert api.batches[-1] == ["Zelený ostrov 2015", "Zelený ostrov", "The Green Island 2015", "The Green Island"], api.batches[-1]
+assert FakeTMDB.made == [k.ENGLISH_TITLE_TIMEOUT] and FakeTMDB.asked == ["movie:12"]
+inputs[:] = [""]; k.tmdbh_play(jp); assert FakeTMDB.asked == ["movie:12"], "podruhé z okna 10000"
+ep = {"mediatype": "episode", "showname": "Tichá řeka", "show_originaltitle": "조용한 강", "season": "1", "episode": "2", "tmdb_id": "7"}
+inputs[:] = [""]; k.tmdbh_play(ep); assert api.batches[-1][:2] == ["Tichá řeka S01E02", "Silent River S01E02"], api.batches[-1]
+inputs[:] = [""]; k.tmdbh_play(dict(jp, tmdb_id="13"))  # chyba TMDb: hledá se bez anglického názvu
+assert api.batches[-1] == ["Zelený ostrov 2015", "Zelený ostrov"] and Window.props[k.ENGLISH_TITLE_PROPERTY + "movie:13"].startswith("!")
+n = len(FakeTMDB.asked); inputs[:] = [""]; k.tmdbh_play(dict(jp, tmdb_id="13")); assert len(FakeTMDB.asked) == n, "chyba: chvíli se neptá znovu"
+Window.props[k.ENGLISH_TITLE_PROPERTY + "movie:13"] = "!0"; inputs[:] = [""]; k.tmdbh_play(dict(jp, tmdb_id="13"))
+assert len(FakeTMDB.asked) == n + 1, "po čase znovu"
+inputs[:] = [""]; k.tmdbh_play(dict(jp, tmdb_id="14"))  # bez anglického překladu: zapamatuje si to
+assert Window.props[k.ENGLISH_TITLE_PROPERTY + "movie:14"] == "-"
+n = len(FakeTMDB.asked); inputs[:] = [""]; k.tmdbh_play(dict(jp, tmdb_id="_")); assert len(FakeTMDB.asked) == n, "bez id se neptá"
+latin = dict(jp, originaltitle="The Green Island"); inputs[:] = [""]; k.tmdbh_play(latin); assert len(FakeTMDB.asked) == n
+Addon.settings["tmdb_api_key"] = ""; Window.props.clear(); inputs[:] = [""]; k.tmdbh_play(jp)
+assert len(FakeTMDB.asked) == n and not [e for e in log if e[0] == "notif" and "TMDb" in str(e)], "bez klíče potichu"
+inputs[:] = [""]; k.tmdbh_play({"mediatype": "movie", "title": "Zelený ostrov", "originaltitle": "_", "year": "2015"})
+assert api.batches[-1] == ["Zelený ostrov 2015", "Zelený ostrov"], api.batches[-1]
+k.TMDB = real_tmdb; Addon.settings.pop("tmdb_api_key")
+print("anglický název pro TMDb Helper: OK")
