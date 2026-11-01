@@ -390,7 +390,7 @@ def metadata_parts(source: Dict[str, Any], include_score: bool = False) -> List[
     return parts
 
 
-# Orange (AARRGGBB) of a length far off the TMDb runtime
+# Orange (AARRGGBB) of a length far off the TMDb runtime and of a bitrate over the auto-play limit
 WARNING_COLOR = "FFFF8C00"
 
 
@@ -403,14 +403,36 @@ def length_part(source: Dict[str, Any]) -> str:
     return length
 
 
+def bitrate_text(bits_per_second: Any, estimated: bool = False) -> str:
+    """"45 Mbit/s", "≈45 Mbit/s" for an estimate from the size, one decimal below 10 Mbit/s; "" when unknown."""
+    try:
+        mbit = float(bits_per_second or 0) / 1_000_000
+    except (TypeError, ValueError):
+        return ""
+    if mbit <= 0:
+        return ""
+    text = f"{mbit:.0f} Mbit/s" if mbit >= 10 else f"{mbit:.1f} Mbit/s"
+    return ("≈" if estimated else "") + text
+
+
+def bitrate_part(source: Dict[str, Any]) -> str:
+    """The bitrate, orange with "!", of a source over the auto-play bitrate limit (set by the TMDb Helper flow);
+    "" for the others: the limit is what the warning is about, the plot has the real bitrate."""
+    if not source.get("bitrate_over"):
+        return ""
+    text = bitrate_text(source.get("bitrate"), bool(source.get("bitrate_estimated")))
+    return f"[COLOR {WARNING_COLOR}]{text} ![/COLOR]" if text else ""
+
+
 def metadata_line(source: Dict[str, Any], include_score: bool = False, include_quality: bool = False) -> str:
     parts: List[str] = []
     if include_quality:
         quality = source.get("quality_label") or "SD"
         resolution = source.get("resolution_label") or "SD"
         parts.append(f"{quality} {resolution}")
-    if length_part(source):
-        parts.append(length_part(source))
+    for part in (length_part(source), bitrate_part(source)):
+        if part:
+            parts.append(part)
     parts.extend(metadata_parts(source, include_score))
     return " | ".join(parts)
 
@@ -429,7 +451,7 @@ def source_heading(source: Dict[str, Any], max_title: int = 42, include_score: b
 def compact_label(source: Dict[str, Any], include_score: bool = True, max_title: int = 42) -> str:
     """One-line fallback label for skins/Kodi builds without detailed select rows."""
     label = source_heading(source, max_title=max_title, include_score=False)
-    parts = ([length_part(source)] if length_part(source) else []) + metadata_parts(source, include_score=False)[:4]
+    parts = [part for part in (length_part(source), bitrate_part(source)) if part] + metadata_parts(source, include_score=False)[:4]
     if parts:
         label += "  •  " + " • ".join(parts)
     if include_score and source.get("score") is not None:

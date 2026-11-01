@@ -128,16 +128,35 @@ Nápady na vylepšení i opravy jsou vítány – založte Issue nebo rovnou po�
 4. Addon vyhledá Webshare zdroje a při vypnutém auto-play zobrazí modální výběr zdroje přímo v TMDb Helper přehrávacím toku. Po výběru se zdroj vyřeší přes `play_ident`.
    Před otevřením výběru zjistí skutečné parametry prvních 10 zdrojů (nejvýše 1,2 s, co nedorazí, je bez nich).
 
-Auto-play přehraje první z 5 nejlepších zdrojů nad prahem skóre, který není trailer/ukázka, část (CD1, 1of2)
-ani film z jiného roku; jinak otevře výběr zdroje. Délku proti stopáži kontrolovat nemůže: TMDb Helper přehrávači
-stopáž nepředává (v řetězci přehrávače není žádná proměnná s délkou), takže v tomto toku jsou jen rozlišení a zvukové stopy.
+Auto-play přehraje první z 5 nejlepších zdrojů nad prahem skóre, který není trailer/ukázka, část (CD1, 1of2),
+film z jiného roku ani soubor s datovým tokem nad limitem (viz **Auto-play maximum bitrate** níže); jinak otevře
+výběr zdroje. Délku proti stopáži kontrolovat nemůže: TMDb Helper přehrávači stopáž nepředává (v řetězci přehrávače
+není žádná proměnná s délkou), takže v tomto toku jsou jen rozlišení, zvukové stopy a datový tok.
 
 Nová nastavení addonu (sekce **TMDb Helper**):
 - **Auto-play best source** – automaticky přehraje nejlépe skórovaný zdroj.
 - **Auto-play minimum score** – minimální skóre, od kterého dojde k auto-play.
+- **Auto-play maximum bitrate** – nejvyšší průměrný datový tok v Mbit/s, který auto-play ještě spustí (výchozí 30,
+  0 = bez omezení). Brání tomu, aby se automaticky pustil třeba 60GB 4K remux (50–80 Mbit/s), který připojení
+  nestihne přenášet a video se zasekává. Nastavte ho asi na dvě třetiny rychlosti připojení (pro 50 Mbit/s tedy 30).
+  - Datový tok se bere z údajů Webshare o souboru (jeho datový tok, jinak velikost / délka). Doplněk si je při
+    zapnutém limitu před auto-play vyžádá u kandidátů (nejvýše 2 s, nejvýše 10 souborů); když nedorazí, odhadne
+    tok z velikosti souboru a obvyklé délky (film 2 h, epizoda 45 min).
+  - Soubor nad limitem auto-play nepřehraje a nezabere mu ani jedno z 5 míst: místo něj se posoudí další zdroj
+    v pořadí (nejdál po hranici **Maximum ranked results**). Když se do limitu nevejde žádný vhodný zdroj, otevře se
+    výběr zdroje s upozorněním „Nejlepší zdroje nesedí, vyberte ručně“.
+  - Ve výběru zdroje zůstanou i soubory nad limitem (můžete je spustit ručně), ve druhém řádku mají oranžově datový
+    tok s vykřičníkem, např. `≈72 Mbit/s !`; `≈` znamená odhad z velikosti. V informacích o položce je i upozornění
+    na limit.
+  - V pořadí zdrojů soubor nad limitem klesne za vyhovující soubor se stejně dobrou shodou názvu a stejným nebo
+    o stupeň nižším rozlišením (počítá se mu, jako by měl o stupeň nižší rozlišení). Před soubor, který názvem sedí
+    zřetelně hůř (jiný rok, díl, epizoda), se tím nikdy nedostane.
 - **Minimum score in the source picker** – zdroje pod tímto skóre se ve výběru zdroje neukážou; poslední řádek „Zobrazit další zdroje pod minimálním skóre“ zobrazí i všechny skryté. Výsledky ručně změněného hledání se nefiltrují. Výchozí 50 (podle benchmarku zůstane asi 98 % správných souborů a skryje se asi 9 z 10 ostatních), 0 = zobrazit vše. Práh obvykle volte nižší než pro auto-play.
 - **Maximum ranked results** – omezení počtu kandidátů v seznamu.
-- **Preferred quality mode** – jemné řazení kvality (`1080p_or_best`, `720p_or_best`, `highest`).
+- **Preferred quality mode** – jemné řazení kvality mezi zdroji se stejně dobrou shodou názvu:
+  `1080p_or_best` (výchozí) dá přednost 1080p, 4K (2160p) až za ním, ale před 720p a SD – 2160p tedy nevyhrává
+  jen tím, že je 2160p; `720p_or_best` řadí od nejvyššího rozlišení, 720p a víc před SD; `highest` vždy nejvyšší
+  rozlišení.
 - **Show debug scores in labels and logs** – zobrazí skóre i v názvech položek a logu.
 
 Poznámka: přesnost párování závisí na kvalitě názvů souborů na Webshare a kvalitě metadat předaných z TMDb Helper.

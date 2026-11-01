@@ -5,6 +5,7 @@
  "lang_pref_bonus": 15,
  "tmdbh_quality": "none",
  "tmdbh_max": 20,
+ "tmdbh_max_bitrate": 30.0,
  "labels": "labels_audited.json",
  "flows": {
   "a": {

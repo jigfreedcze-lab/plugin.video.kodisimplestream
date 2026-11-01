@@ -4,11 +4,14 @@
 python -X utf8 tools/benchmark/evaluate.py [--data <snapshot>] [--repo <repo>] [--split train|holdout|all]
        [--flow a|b|both] [--labels labels_audited.json] [--json out.json] [--per-case]
        [--public-json results/<name>.json] [--compare results/<name>.json]
+       [--tmdbh-quality none|1080p_or_best|720p_or_best|highest] [--tmdbh-max-bitrate 30]
 
 Flow a: TMDb search inside the add-on (handle_tmdb_selection / list_episodes -> list_search_results).
         Uses matching.build_search_queries(match) and matching.rank_files(results_per_query, match, preference)
         from --repo when both exist, otherwise a copy of the current add-on logic.
-Flow b: TMDb Helper (tmdbh_play -> search_and_score_tmdbh) with matching.build_tmdbh_queries.
+Flow b: TMDb Helper (tmdbh_play -> search_and_score_tmdbh) with matching.build_tmdbh_queries; the order is a
+        copy of kodisimplestream._tmdbh_sort_key incl. the bitrate limit (--tmdbh-max-bitrate, the bitrate
+        estimated from the size: the snapshot has no file_info of the search results) and --tmdbh-quality.
 Webshare answers come from <data>/cache/<id>.json only, a query missing there counts as an empty result.
 The snapshot with file names is private (--data or KSS_BENCH_DATA, default ../KodiSimpleStream-benchmark next
 to the repository). --public-json writes results without file names and idents, those go to results/.
@@ -62,6 +65,10 @@ class Repo:
         self.custom_flow_a = all(callable(getattr(self.matching, name, None))
                                  for name in ("build_search_queries", "rank_files"))
         self.lang_pref_bonus = self._addon_constant("LANG_PREF_BONUS", 15)
+        try:  # pure module (stdlib + preview + source_ui); older working copies without it use the copy below
+            self.file_details = importlib.import_module("resources.lib.file_details")
+        except ImportError:
+            self.file_details = None
 
     def _addon_constant(self, name: str, default: int) -> int:
         if isinstance(getattr(self.matching, name, None), int):
@@ -158,21 +165,59 @@ def run_flow_a(repo: Repo, case: Dict[str, Any], cache: Cache, preference: str) 
     return queries, ranked
 
 
+# kodisimplestream.QUALITY_PREFERENCES and QUALITY_CAPS, matching.QUALITY_ORDER
+QUALITY_ORDER = ["2160p", "1080p", "720p", "sd"]
+QUALITY_PREFERENCES = {
+    "highest": {"2160p": 4, "1080p": 3, "720p": 2, "sd": 1},
+    "720p_or_best": {"2160p": 4, "1080p": 3, "720p": 2},
+    "1080p_or_best": {"1080p": 4, "2160p": 3},
+}
+QUALITY_CAPS = {"1080p_or_best": "1080p"}
+
+
 def quality_pref_value(setting: str, quality: str) -> int:
     """kodisimplestream._prefer_quality_value, "none" stands for quality_pref 0."""
-    if setting == "none":
-        return 0
-    base = {"2160p": 4, "1080p": 3, "720p": 2, "sd": 1}.get(quality, 0)
-    if setting == "highest":
-        return base
-    if setting == "720p_or_best":
-        return base if base >= 2 else 0
-    return base if base >= 3 else 0
+    return QUALITY_PREFERENCES.get(setting, {}).get(quality, 0)
+
+
+def quality_points(repo: Repo, quality: str, mediatype: str) -> int:
+    """matching.quality_points (a copy for working copies without it)."""
+    if callable(getattr(repo.matching, "quality_points", None)):
+        return repo.matching.quality_points(quality, mediatype)
+    return {"2160p": 30, "1080p": 20, "720p": 10}.get(quality, 0) // (5 if mediatype == "episode" else 4)
+
+
+def quality_adjustment(repo: Repo, setting: str, quality: str, mediatype: str) -> Tuple[int, int]:
+    """kodisimplestream._quality_adjustment: (the score's quality points above the resolution of the mode,
+    the points of one resolution step lower that a source over the bitrate limit loses)."""
+    cap = QUALITY_CAPS.get(setting)
+    counted, excess = quality, 0
+    if cap and quality in QUALITY_ORDER and QUALITY_ORDER.index(quality) < QUALITY_ORDER.index(cap):
+        counted, excess = cap, quality_points(repo, quality, mediatype) - quality_points(repo, cap, mediatype)
+    if counted not in QUALITY_ORDER[:-1]:
+        return excess, 0
+    lower = QUALITY_ORDER[QUALITY_ORDER.index(counted) + 1]
+    return excess, quality_points(repo, counted, mediatype) - quality_points(repo, lower, mediatype)
+
+
+def estimated_bitrate(repo: Repo, size: int, mediatype: str, runtime: Any) -> Optional[float]:
+    """file_details.source_bitrate without file_info (the snapshot has none for the search results):
+    the size over the TMDb runtime or a typical length."""
+    if repo.file_details is not None and callable(getattr(repo.file_details, "source_bitrate", None)):
+        return repo.file_details.source_bitrate(size, None, mediatype, runtime)[0]
+    if not size or size <= 0:
+        return None
+    return size * 8 / ((45 if mediatype == "episode" else 120) * 60)
+
+
+def over_bitrate(bits_per_second: Optional[float], limit_mbit: float) -> bool:
+    """file_details.over_bitrate."""
+    return bool(limit_mbit and limit_mbit > 0 and bits_per_second and bits_per_second > limit_mbit * 1_000_000)
 
 
 def run_flow_b(repo: Repo, case: Dict[str, Any], cache: Cache, preference: str,
-               quality_setting: str, max_results: int) -> Tuple[List[str], List[Dict]]:
-    """search_and_score_tmdbh without the Kodi parts."""
+               quality_setting: str, max_results: int, max_bitrate: float = 30.0) -> Tuple[List[str], List[Dict]]:
+    """search_and_score_tmdbh without the Kodi parts (no file_info: the bitrate is the estimate from the size)."""
     params = {str(k): str(v) for k, v in case["tmdbh_params"].items()}
     matching, source_ui = repo.matching, repo.source_ui
     # The add-on looks up the English title on TMDb when the original is in another script (tmdbh_play);
@@ -193,15 +238,19 @@ def run_flow_b(repo: Repo, case: Dict[str, Any], cache: Cache, preference: str,
             score = (matching.score_episode_result(file_info, params) if mediatype == "episode"
                      else matching.score_movie_result(file_info, params))
             quality = matching.parse_quality(name)
+            size = matching.parse_size(file_info.get("size"))
             item = {
                 "ident": ident,
                 "name": name,
                 "img": file_info.get("img", ""),
-                "size": matching.parse_size(file_info.get("size")),
+                "size": size,
                 "quality": quality.get("quality", "sd"),
                 "score": score,
                 "quality_pref": quality_pref_value(quality_setting, quality.get("quality", "sd")),
+                "bitrate": estimated_bitrate(repo, size, mediatype, params.get("runtime")),
             }
+            item["quality_excess"], item["bitrate_penalty"] = quality_adjustment(repo, quality_setting, item["quality"],
+                                                                                 mediatype)
             source = source_ui.normalize_source(item)
             source["score"] = score
             item["source"] = source
@@ -209,12 +258,15 @@ def run_flow_b(repo: Repo, case: Dict[str, Any], cache: Cache, preference: str,
             if prev is None or item["score"] > prev["score"]:
                 merged[ident] = item
     bonus = repo.lang_pref_bonus
-    ranked = sorted(
-        merged.values(),
-        key=lambda x: (x["score"] + (bonus if source_ui.matches_language_preference(x["source"], preference) else 0),
-                       x["quality_pref"], x["size"]),
-        reverse=True,
-    )
+
+    def key(x: Dict[str, Any]) -> Tuple[Any, ...]:
+        """kodisimplestream._tmdbh_sort_key"""
+        over = over_bitrate(x["bitrate"], max_bitrate)
+        rank = (x["score"] + (bonus if source_ui.matches_language_preference(x["source"], preference) else 0)
+                - x["quality_excess"] - (x["bitrate_penalty"] if over else 0))
+        return rank, not over, x["quality_pref"], x["size"]
+
+    ranked = sorted(merged.values(), key=key, reverse=True)
     return queries, [{k: v for k, v in item.items() if k != "source"} for item in ranked[:max_results]]
 
 
@@ -246,7 +298,8 @@ def evaluate_flow(flow: str, repo: Repo, cases: List[Dict], labels: Dict[str, Di
         if flow == "a":
             queries, ranked = run_flow_a(repo, case, cache, args.preference)
         else:
-            queries, ranked = run_flow_b(repo, case, cache, args.preference, args.tmdbh_quality, args.tmdbh_max)
+            queries, ranked = run_flow_b(repo, case, cache, args.preference, args.tmdbh_quality, args.tmdbh_max,
+                                         args.tmdbh_max_bitrate)
         idents = []
         for item in ranked:
             if not isinstance(item, dict) or not item.get("ident"):
@@ -407,6 +460,8 @@ def main() -> None:
     parser.add_argument("--tmdbh-quality", choices=QUALITY_PREF_SETTINGS, default="none",
                         help="tmdbh_prefer_quality for flow b, none = quality_pref 0")
     parser.add_argument("--tmdbh-max", type=int, default=20, help="tmdbh_max_results for flow b")
+    parser.add_argument("--tmdbh-max-bitrate", type=float, default=30.0,
+                        help="tmdbh_max_bitrate (Mbit/s, 0 = no limit) for flow b, estimated from the file size")
     args = parser.parse_args()
     DATA = os.path.abspath(args.data)
     if not os.path.isdir(os.path.join(DATA, "cache")):
@@ -432,13 +487,14 @@ def main() -> None:
     print(f"repo {repo.path}")
     print(f"flow a: {'matching.build_search_queries + rank_files' if repo.custom_flow_a else 'copy of the add-on logic'}"
           f" | split {args.split} | {len(cases)} cases | labels {os.path.basename(args.labels)}"
-          f" | preference {args.preference or 'none'} (bonus {repo.lang_pref_bonus})")
+          f" | preference {args.preference or 'none'} (bonus {repo.lang_pref_bonus})"
+          f" | flow b quality {args.tmdbh_quality}, max bitrate {args.tmdbh_max_bitrate:g} Mbit/s")
 
     report: Dict[str, Any] = {
         "repo": repo.path, "split": args.split, "labels": os.path.abspath(args.labels),
         "custom_flow_a": repo.custom_flow_a, "preference": args.preference,
         "lang_pref_bonus": repo.lang_pref_bonus, "tmdbh_quality": args.tmdbh_quality,
-        "tmdbh_max": args.tmdbh_max, "flows": {},
+        "tmdbh_max": args.tmdbh_max, "tmdbh_max_bitrate": args.tmdbh_max_bitrate, "flows": {},
     }
     for flow in (["a", "b"] if args.flow == "both" else [args.flow]):
         flow_result = evaluate_flow(flow, repo, cases, labels, pools, args)

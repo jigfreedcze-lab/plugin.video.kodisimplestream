@@ -283,3 +283,11 @@ msgstr "No source reaches the minimum score ({} hidden)"
 msgctxt "#30079"
 msgid "Animated preview of the focused file (Wide list view)"
 msgstr "Animated preview of the focused file (Wide list view)"
+
+msgctxt "#30080"
+msgid "Auto-play maximum bitrate (Mbit/s, 0 = no limit)"
+msgstr "Auto-play maximum bitrate (Mbit/s, 0 = no limit)"
+
+msgctxt "#30081"
+msgid "Bitrate {} is over the auto-play limit ({} Mbit/s)"
+msgstr "Bitrate {} is over the auto-play limit ({} Mbit/s)"

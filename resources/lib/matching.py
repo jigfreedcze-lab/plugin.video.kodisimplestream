@@ -313,17 +313,34 @@ def build_search_queries(match: Dict[str, Any]) -> List[str]:
 # File name parts
 # ----------------------------------------------------------------------------
 
+QUALITY_SCORES = {"2160p": 30, "1080p": 20, "720p": 10, "sd": 0}
+# The match score adds quality_score // divisor: at most 7 points for a film, 6 for an episode
+MOVIE_QUALITY_DIVISOR = 4
+EPISODE_QUALITY_DIVISOR = 5
+
+
 def parse_quality(filename: str) -> Dict[str, Any]:
     text = normalize_title(filename)
     quality = "sd"
-    score = 0
-    if "2160p" in text:
-        quality, score = "2160p", 30
-    elif "1080p" in text:
-        quality, score = "1080p", 20
-    elif "720p" in text:
-        quality, score = "720p", 10
-    return {"quality": quality, "quality_score": score}
+    for name in ("2160p", "1080p", "720p"):
+        if name in text:
+            quality = name
+            break
+    return {"quality": quality, "quality_score": QUALITY_SCORES[quality]}
+
+
+def quality_points(quality: str, mediatype: str = "movie") -> int:
+    """Points the match score gives a resolution of the name ("2160p", "1080p", "720p", "sd")."""
+    divisor = EPISODE_QUALITY_DIVISOR if str(mediatype or "").lower() == "episode" else MOVIE_QUALITY_DIVISOR
+    return QUALITY_SCORES.get(quality, 0) // divisor
+
+
+def quality_step_down(quality: str, mediatype: str = "movie") -> int:
+    """Points the score's quality bonus loses one resolution step lower (2160p -> 1080p -> 720p -> SD; 0 for SD)."""
+    if quality not in QUALITY_ORDER[:-1]:
+        return 0
+    lower = QUALITY_ORDER[QUALITY_ORDER.index(quality) + 1]
+    return quality_points(quality, mediatype) - quality_points(lower, mediatype)
 
 
 def parse_size(size_value: Any) -> int:
@@ -724,7 +741,7 @@ def score_movie_result(file_info: Dict[str, Any], params: Dict[str, Any]) -> int
 
     if _has_bad_tokens(name, vocabulary):
         score += BAD_TOKEN
-    score += _quality_points(name, 4)
+    score += _quality_points(name, MOVIE_QUALITY_DIVISOR)
     return int(round(score))
 
 
@@ -798,7 +815,7 @@ def score_episode_result(file_info: Dict[str, Any], params: Dict[str, Any]) -> i
 
     if _has_bad_tokens(name, vocabulary):
         score += BAD_TOKEN
-    score += _quality_points(name, 5)
+    score += _quality_points(name, EPISODE_QUALITY_DIVISOR)
     return int(round(score))
 
 

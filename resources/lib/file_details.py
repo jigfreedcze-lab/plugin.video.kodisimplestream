@@ -28,6 +28,9 @@ REQUEST_WAIT = 4.0
 LIST_COUNT = 15
 PICKER_COUNT = 10
 AUTOPLAY_COUNT = 5
+# file_info requests of one auto-play check at most: a source over the bitrate limit frees its slot for the next
+# one, which needs its details too (no more than the picker after it would request anyway)
+AUTOPLAY_FETCH_MAX = 10
 # Seconds: the background script of a list starts no request later than LIST_BUDGET after its start;
 # the picker and the auto-play wait at most their deadline and show or check what arrived by then
 LIST_BUDGET = 6.0
@@ -50,6 +53,10 @@ BLOCK_PROPERTY = "kodisimplestream.details_blocked"
 # films within +-10 %; parts CD1/CD2 and short cuts are the few false alarms)
 MOVIE_RANGE = (0.8, 1.5)
 EPISODE_RANGE = (0.45, 1.5)
+# Lengths assumed for a bitrate estimate from the size alone (TMDb Helper passes no runtime). On the benchmark
+# files with file_info the estimate of a film was within -31 %/+38 % of the real bitrate for 8 in 10 files.
+MOVIE_TYPICAL_MINUTES = 120
+EPISODE_TYPICAL_MINUTES = 45
 _KEEP_STREAMS = 12
 _STOP_STATUSES = (403, 429)
 
@@ -86,6 +93,39 @@ def length_mismatch(info: Optional[Dict[str, Any]], runtime: Any, mediatype: str
     low, high = EPISODE_RANGE if str(mediatype).lower() == "episode" else MOVIE_RANGE
     ratio = seconds / (minutes * 60)
     return not low <= ratio <= high
+
+
+def bitrate(info: Optional[Dict[str, Any]], size: Any = None) -> Optional[float]:
+    """Average bits per second of the whole file from file_info: its bitrate, else its size (or `size`, bytes
+    from the search result) over its length; None when file_info knows neither."""
+    info = info or {}
+    known = preview._number(info.get("bitrate"))
+    if known:
+        return known
+    seconds = length_seconds(info)
+    total = preview._number(info.get("size")) or preview._number(size)
+    return total * 8 / seconds if seconds and total else None
+
+
+def source_bitrate(size: Any, info: Optional[Dict[str, Any]] = None, mediatype: str = "movie",
+                   runtime: Any = None) -> Tuple[Optional[float], bool]:
+    """(bits per second, estimated) of a source: from file_info when it knows the bitrate or the length,
+    otherwise estimated from the size (bytes) over the TMDb runtime or a typical length (MOVIE_/
+    EPISODE_TYPICAL_MINUTES); (None, False) without a size."""
+    known = bitrate(info, size)
+    if known:
+        return known, False
+    total = preview._number(size) or preview._number((info or {}).get("size"))
+    if not total:
+        return None, False
+    episode = str(mediatype or "").lower() == "episode"
+    minutes = runtime_minutes(runtime) or (EPISODE_TYPICAL_MINUTES if episode else MOVIE_TYPICAL_MINUTES)
+    return total * 8 / (minutes * 60), True
+
+
+def over_bitrate(bits_per_second: Optional[float], limit_mbit: float) -> bool:
+    """True when a known or estimated bitrate is above the limit (Mbit/s, 0 or less = no limit)."""
+    return bool(limit_mbit and limit_mbit > 0 and bits_per_second and bits_per_second > limit_mbit * 1_000_000)
 
 
 def resolution(info: Optional[Dict[str, Any]]) -> Optional[Tuple[str, str]]:

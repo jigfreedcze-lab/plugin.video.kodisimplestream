@@ -3,6 +3,9 @@ import unittest
 from resources.lib.matching import (
     build_tmdbh_queries,
     normalize_title,
+    parse_quality,
+    quality_points,
+    quality_step_down,
     score_episode_result,
     score_movie_result,
 )
@@ -47,6 +50,21 @@ class MatchingTests(unittest.TestCase):
         normal = score_movie_result({"name": "Dune.2021.1080p.WEB-DL.mkv"}, params)
         trailer = score_movie_result({"name": "Dune.2021.trailer.1080p.mkv"}, params)
         self.assertGreater(normal, trailer)
+
+    def test_quality_points_match_the_score(self):
+        # what the score adds for the resolution in the name (the TMDb Helper order takes the 2160p excess off)
+        self.assertEqual([quality_points(q) for q in ("2160p", "1080p", "720p", "sd")], [7, 5, 2, 0])
+        self.assertEqual([quality_points(q, "episode") for q in ("2160p", "1080p", "720p", "sd")], [6, 4, 2, 0])
+        self.assertEqual(quality_points("4k"), 0)
+        params = {"title": "Dune", "year": "2021"}
+        uhd = score_movie_result({"name": "Dune.2021.2160p.mkv"}, params)
+        fhd = score_movie_result({"name": "Dune.2021.1080p.mkv"}, params)
+        self.assertEqual(uhd - fhd, quality_points("2160p") - quality_points("1080p"))
+        self.assertEqual(parse_quality("Dune.2021.2160p.1080p.mkv"), {"quality": "2160p", "quality_score": 30})
+        self.assertEqual(parse_quality("Dune.mkv"), {"quality": "sd", "quality_score": 0})
+        # one resolution step lower: what a source over the bitrate limit loses in the TMDb Helper order
+        self.assertEqual([quality_step_down(q) for q in ("2160p", "1080p", "720p", "sd", "x")], [2, 3, 2, 0, 0])
+        self.assertEqual([quality_step_down(q, "episode") for q in ("2160p", "1080p", "720p", "sd")], [2, 2, 2, 0])
 
 
 if __name__ == "__main__":

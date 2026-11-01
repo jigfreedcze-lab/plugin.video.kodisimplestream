@@ -1,4 +1,8 @@
 from resources.lib.source_ui import (
+    WARNING_COLOR,
+    bitrate_part,
+    bitrate_text,
+    compact_label,
     detect_audio_format,
     detect_codec,
     detect_languages,
@@ -75,3 +79,22 @@ def test_title_label_omits_quality_when_badge_art_is_used():
     assert source_title_label(source) == "The.Matrix.1999.2160p.BluRay.x265"
     assert not source_title_label(source).startswith("[4K 2160p]")
     assert metadata_line(source, include_quality=True).startswith("4K 2160p | Size 5.0 GB")
+
+
+def test_bitrate_marker_only_over_the_limit():
+    assert bitrate_text(45_200_000) == "45 Mbit/s" and bitrate_text(71_600_000, estimated=True) == "≈72 Mbit/s"
+    assert bitrate_text(8_440_000) == "8.4 Mbit/s" and bitrate_text(0) == bitrate_text(None) == bitrate_text("x") == ""
+    source = normalize_source({"name": "Film.2010.2160p.REMUX.mkv", "size": str(60 * 1024 ** 3)})
+    assert bitrate_part(source) == "" and "Mbit" not in metadata_line(source, include_quality=True)
+    source.update(bitrate=71_600_000, bitrate_estimated=True, bitrate_over=True)
+    marker = f"[COLOR {WARNING_COLOR}]≈72 Mbit/s ![/COLOR]"
+    assert bitrate_part(source) == marker
+    # the second line: right after the quality (and the length), before the size that a long line cuts off
+    assert metadata_line(source, include_quality=True) == f"4K 2160p | {marker} | Size 60.0 GB", metadata_line(source, include_quality=True)
+    source.update(length_text="1:58:00")
+    assert metadata_line(source, include_quality=True).startswith(f"4K 2160p | 1:58:00 | {marker} | Size")
+    assert f"  •  1:58:00 • {marker} • Size" in compact_label(source)
+    source.update(bitrate=45_000_000, bitrate_estimated=False)
+    assert bitrate_part(source) == f"[COLOR {WARNING_COLOR}]45 Mbit/s ![/COLOR]"
+    source.update(bitrate=None)
+    assert bitrate_part(source) == ""

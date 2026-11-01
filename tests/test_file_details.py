@@ -55,7 +55,7 @@ sys.modules["xbmcvfs"] = types.SimpleNamespace(translatePath=lambda path: os.pat
 
 STRINGS = {30042: "dabing", 30043: "titulky", 30061: "Video", 30062: "Bitrate", 30063: "Length", 30064: "Audio",
            30065: "Size", 30066: "Container", 30067: "Unavailable", 30068: "Subtitles", 30070: "Not analysed",
-           30073: "Length does not match ({} min)", 30074: "CHOOSE"}
+           30073: "Length does not match ({} min)", 30074: "CHOOSE", 30081: "Bitrate {} over the limit ({} Mbit/s)"}
 
 
 class Addon:
@@ -132,10 +132,14 @@ def info_xml(fields, video=(), audio=()):
     return (f"<response><status>OK</status>{body}{streams('video', video)}{streams('audio', audio)}</response>").encode()
 
 
-def film(length="7080", width="1920", height="800", audio=(("CZE", "6", "AC3"), ("ENG", "2", "AAC"))):
+def film(length="7080", width="1920", height="800", audio=(("CZE", "6", "AC3"), ("ENG", "2", "AAC")),
+         size="2147483648", bitrate=None):
+    fields = {"name": "Synthetic.mkv", "size": size, "type": "mkv", "length": length, "format": "H264",
+              "width": width, "height": height, "fps": "25"}
+    if bitrate:
+        fields["bitrate"] = bitrate
     return preview.parse_file_info(info_xml(
-        {"name": "Synthetic.mkv", "size": "2147483648", "type": "mkv", "length": length, "format": "H264",
-         "width": width, "height": height, "fps": "25"},
+        fields,
         [{"format": "H264", "width": width, "height": height, "fps": "25"}],
         [{"format": codec, "channels": ch, "language": lang} for lang, ch, codec in audio]))
 
@@ -167,6 +171,20 @@ assert fd.video_stream({"length": "60"}) is None and fd.audio_streams(None) == [
 small = fd.compact(info)
 assert "name" not in small and small["length"] == "7080" and len(small["audio"]) == 2, small
 assert len(fd.compact({"audio": [{"language": "CZE"}] * 50})["audio"]) == fd._KEEP_STREAMS and fd.compact("x") is None
+# the bitrate: file_info's own, else its size (or the list's) over its length, else an estimate from the
+# size over the TMDb runtime or a typical length (2 h a film, 45 min an episode)
+GIB = 1024 ** 3
+assert fd.bitrate(film(bitrate="45000000")) == 45e6 and fd.bitrate(film(size=str(9 * GIB), length="7200")) == 9 * GIB * 8 / 7200
+assert fd.bitrate({"length": "3600"}, size=str(GIB)) == GIB * 8 / 3600 and fd.bitrate({"size": "100"}) is None
+assert fd.bitrate(None) is None and fd.bitrate({"bitrate": "x", "length": "0", "size": "5"}) is None
+assert fd.source_bitrate(str(GIB), film(bitrate="45000000")) == (45e6, False)
+assert fd.source_bitrate(60 * GIB) == (60 * GIB * 8 / 7200, True)
+assert fd.source_bitrate(60 * GIB, None, "episode") == (60 * GIB * 8 / 2700, True)
+assert fd.source_bitrate(60 * GIB, {"width": "1920"}, "movie", runtime="150") == (60 * GIB * 8 / 9000, True)
+assert fd.source_bitrate(60 * GIB, None, "movie", runtime="0") == (60 * GIB * 8 / 7200, True)  # unknown runtime
+assert fd.source_bitrate(0) == (None, False) and fd.source_bitrate("", None) == (None, False)
+assert fd.over_bitrate(31e6, 30) and not fd.over_bitrate(30e6, 30) and not fd.over_bitrate(90e6, 0)
+assert not fd.over_bitrate(None, 30) and not fd.over_bitrate(90e6, -1)
 groups += 1
 
 # 2. names the auto-play must not take without asking (scores unchanged, see the benchmark)
@@ -555,10 +573,16 @@ serve({"A0": film(length="1500"), "A1": film(length="7000")}); fetched.clear()
 log.clear(); k.tmdbh_play(dict(tm, runtime="118"))
 assert log[-1] == ("resolved", True, "https://dl/A1") and not [e for e in log if e[0] == "select"], log
 assert any("skips (length)" in e[1] for e in log if e[0] == "log") and set(fetched) <= {"A0", "A1", "A2"}, log
-# without a runtime (TMDb Helper passes none) and without the Czech preference: no file_info wait at all
+# without a runtime (TMDb Helper passes none), the Czech preference and the bitrate limit: no file_info wait at all
+Addon.settings["tmdbh_max_bitrate"] = "0"
 Window.props.clear(); shutil.rmtree(os.path.join(TMP, "profile"), ignore_errors=True); fetched.clear()
 log.clear(); k.tmdbh_play(tm)
 assert fetched == [] and log[-1] == ("resolved", True, "https://dl/A0"), (fetched, log)
+# the limit on (default 30 Mbit/s): the candidates' file_info is needed for the real bitrate
+Addon.settings.pop("tmdbh_max_bitrate")
+Window.props.clear(); shutil.rmtree(os.path.join(TMP, "profile"), ignore_errors=True); fetched.clear()
+log.clear(); k.tmdbh_play(tm)
+assert sorted(fetched) == ["A0", "A1", "A2"] and log[-1] == ("resolved", True, "https://dl/A0"), (fetched, log)
 # every candidate rejected (trailer, wrong length) -> notification and the picker, not a doubtful file
 api.files = [ws("B0", "Synthetic.Film.2010.1080p.mkv"), ws("B1", "Synthetic.Film.2010.Trailer.mkv")]
 serve({"B0": film(length="600")}); Window.props.clear(); shutil.rmtree(os.path.join(TMP, "profile"), ignore_errors=True)
@@ -573,6 +597,140 @@ api.files = [ws("B0", "Synthetic.Film.2010.1080p.mkv")]
 log.clear(); k.tmdbh_play(dict(tm, runtime="118"))
 assert log[-1] == ("resolved", True, "https://dl/B0"), log
 Addon.settings.update(tmdbh_auto_play_best="", tmdbh_auto_play_min_score="")
+groups += 1
+
+# 10b. the auto-play bitrate limit (tmdbh_max_bitrate, default 30 Mbit/s): no source over it is started,
+#      one over it uses no candidate slot, all over it -> the picker with the sources marked; 0 = off
+def fresh_details():
+    Window.props.clear(); shutil.rmtree(os.path.join(TMP, "profile"), ignore_errors=True); fetched.clear()
+def sized(ident, name, gib): return dict(ws(ident, name), size=str(int(gib * GIB)))
+def skips(): return [e[1] for e in log if e[0] == "log" and "Autoplay skips" in e[1]]
+Addon.settings.update(tmdbh_auto_play_best="true", tmdbh_auto_play_min_score="50")
+remuxes = [sized(f"U{i}", f"Synthetic.Film.2010.2160p.U{i}.mkv", 60) for i in range(fd.AUTOPLAY_COUNT)]
+fitting = sized("F0", "Synthetic.Film.1080p.mkv", 8)  # no year in the name: 20 points less, below all the remuxes
+api.files = remuxes + [fitting]
+serve(dict({f"U{i}": film(size=str(60 * GIB)) for i in range(fd.AUTOPLAY_COUNT)}, F0=film(size=str(8 * GIB))))
+fresh_details(); log.clear(); k.tmdbh_play(tm)
+# the five better matches are all over the limit: they use no slot, the sixth row gets one and is played
+assert log[-1] == ("resolved", True, "https://dl/F0") and not [e for e in log if e[0] in ("select", "notif")], log
+assert len(skips()) == fd.AUTOPLAY_COUNT and all("skips (bitrate)" in line and "bitrate=73 Mbit/s" in line for line in skips()), skips()
+assert sorted(fetched) == sorted([f"U{i}" for i in range(fd.AUTOPLAY_COUNT)] + ["F0"]), fetched
+# the real bitrate from file_info: estimated under the limit (20 GB over 2 h), 45 Mbit/s in fact -> skipped
+api.files = [sized("E0", "Synthetic.Film.2010.1080p.mkv", 20), sized("E1", "Synthetic.Film.1080p.mkv", 4)]
+serve({"E0": film(size=str(20 * GIB), bitrate="45000000"), "E1": film(size=str(4 * GIB))})
+fresh_details(); log.clear(); k.tmdbh_play(tm)
+assert log[-1] == ("resolved", True, "https://dl/E1") and len(skips()) == 1 and "score=95 bitrate=45 Mbit/s" in skips()[0], log
+# the candidates stay bounded: at most AUTOPLAY_FETCH_MAX requests and never beyond tmdbh_max_results
+api.files = [sized(f"V{i}", f"Synthetic.Film.2010.2160p.V{i}.mkv", 60) for i in range(14)] + [fitting]
+serve({f"V{i}": film(size=str(60 * GIB)) for i in range(14)})
+fresh_details(); log.clear(); selects[:] = [-1]; k.tmdbh_play(tm)
+autoplay_fetched = fetched[:fd.AUTOPLAY_FETCH_MAX]
+assert len(set(fetched)) == len(fetched) and "F0" not in autoplay_fetched, fetched
+# 14 over the limit, the 15th fits but the picker lists only 20 and the first ten got details; the rest are
+# over by their estimate too: no slot used, all checked, F0 is the 15th row and the first fitting one
+assert log[-1] == ("resolved", True, "https://dl/F0") and len(skips()) == 14, (skips(), log[-3:])
+Addon.settings["tmdbh_max_results"] = "3"
+fresh_details(); log.clear(); selects[:] = [-1]; k.tmdbh_play(tm)
+assert len(skips()) == 3 and ("notif", "CHOOSE") in log and set(fetched) <= {"V0", "V1", "V2"}, (skips(), fetched)
+Addon.settings.pop("tmdbh_max_results")
+# all over the limit -> "choose one" and the picker: all listed, marked orange with the real bitrate
+api.files = remuxes[:2] + [sized("S0", "Synthetic.Film.2010.1080p.mkv", 40)]
+serve({"U0": film(size=str(60 * GIB)), "U1": film(size=str(60 * GIB)), "S0": film(size=str(40 * GIB))})
+fresh_details(); log.clear(); selects[:] = [3]; k.tmdbh_play(tm)
+assert [e[0] for e in log if e[0] != "log"] == ["notif", "select", "resolved"] and ("notif", "CHOOSE") in log, log
+(_, labels, plots), = [e for e in log if e[0] == "select"]
+assert len(labels) == 4 and all(f"[COLOR {k.WARNING_COLOR}]" in label for label in labels[1:]), labels
+assert f"| [COLOR {k.WARNING_COLOR}]73 Mbit/s ![/COLOR] |" in labels[2] and "≈" not in labels[2], labels  # real, from file_info
+assert f"[COLOR {k.WARNING_COLOR}]Bitrate 49 Mbit/s over the limit (30 Mbit/s)[/COLOR]" in plots[1].split("[CR]"), plots[1]
+assert log[-1] == ("resolved", True, "https://dl/U1"), log  # the user may choose one over the limit
+# without file_info (setting off): the estimate from the size, marked as approximate
+Addon.settings["file_details"] = "false"
+fresh_details(); log.clear(); selects[:] = [-1]; k.tmdbh_play(tm)
+(_, labels, plots), = [e for e in log if e[0] == "select"]
+assert fetched == [] and f"| [COLOR {k.WARNING_COLOR}]≈72 Mbit/s ![/COLOR] |" in labels[2], labels
+assert f"[COLOR {k.WARNING_COLOR}]Bitrate ≈72 Mbit/s over the limit (30 Mbit/s)[/COLOR]" in plots[2].split("[CR]"), plots[2]
+Addon.settings.pop("file_details")
+# a higher limit: the same sources fit and are not marked; the 1080p mode (default) takes the 1080p one
+Addon.settings["tmdbh_max_bitrate"] = "80"
+fresh_details(); log.clear(); k.tmdbh_play(tm)
+assert log[-1] == ("resolved", True, "https://dl/S0") and not skips(), log
+# 0 = no limit: the old behaviour, the best one played without waiting for file_info (no runtime given):
+# the 60 GB remux in the "highest" mode, unmarked in the picker
+Addon.settings.update(tmdbh_max_bitrate="0", tmdbh_prefer_quality="highest")
+fresh_details(); log.clear(); k.tmdbh_play(tm)
+assert log[-1] == ("resolved", True, "https://dl/U0") and fetched == [] and not skips(), (fetched, log)
+fresh_details(); log.clear(); selects[:] = [-1]; k.select_tmdbh_source(tm)
+(_, labels, _), = [e for e in log if e[0] == "select"]
+assert not any("COLOR" in label for label in labels) and "U0" in labels[1], labels
+Addon.settings.pop("tmdbh_max_bitrate"); Addon.settings.pop("tmdbh_prefer_quality")
+Addon.settings.update(tmdbh_auto_play_best="", tmdbh_auto_play_min_score="")
+for value, expected in (("", 30.0), ("50", 50.0), ("0", 0.0), ("-5", 0.0), ("abc", 30.0), ("12.5", 12.5)):
+    Addon.settings["tmdbh_max_bitrate"] = value; assert k._max_bitrate() == expected, value
+Addon.settings.pop("tmdbh_max_bitrate")
+groups += 1
+
+# 10c. the TMDb Helper order: a source over the limit drops below a fitting one of the same title match and the
+#      same or the next lower resolution, never below a clearly worse match; the 1080p mode does not prefer
+#      2160p; "highest" does
+order_files = [sized("UHD", "Synthetic.Film.2010.2160p.mkv", 60), sized("FHD", "Synthetic.Film.2010.1080p.mkv", 8),
+               sized("SMALL4K", "Synthetic.Film.2010.2160p.HEVC.mkv", 10),
+               sized("NOYEAR", "Synthetic.Film.1080p.mkv", 2), sized("WRONG", "Synthetic.Film.1987.1080p.mkv", 2)]
+api.files = order_files
+fresh_details()
+scores = {r["ident"]: r["score"] for r in k.search_and_score_tmdbh(tm)}
+assert scores == {"UHD": 97, "FHD": 95, "SMALL4K": 97, "NOYEAR": 75, "WRONG": 50}, scores
+for mode, limit, expected in (("1080p_or_best", "", ["FHD", "SMALL4K", "UHD", "NOYEAR", "WRONG"]),
+                              ("", "", ["FHD", "SMALL4K", "UHD", "NOYEAR", "WRONG"]),  # the default mode
+                              ("1080p_or_best", "0", ["FHD", "UHD", "SMALL4K", "NOYEAR", "WRONG"]),
+                              ("highest", "", ["SMALL4K", "FHD", "UHD", "NOYEAR", "WRONG"]),
+                              ("highest", "0", ["UHD", "SMALL4K", "FHD", "NOYEAR", "WRONG"]),
+                              ("720p_or_best", "", ["SMALL4K", "FHD", "UHD", "NOYEAR", "WRONG"])):
+    Addon.settings.update(tmdbh_prefer_quality=mode, tmdbh_max_bitrate=limit)
+    got = [r["ident"] for r in k.search_and_score_tmdbh(tm)]
+    assert got == expected, (mode, limit, got)
+# over the limit a source counts one resolution step lower: a fitting 720p file of the same title match comes
+# first, a fitting SD one does not (resolution still counts, and a larger penalty would let equally scored
+# wrong files overtake right ones)
+api.files = [sized("O1080", "Synthetic.Film.2010.1080p.mkv", 60), sized("F720", "Synthetic.Film.2010.720p.mkv", 2),
+             sized("FSD", "Synthetic.Film.2010.mkv", 1)]
+assert [r["ident"] for r in k.search_and_score_tmdbh(tm)] == ["F720", "O1080", "FSD"]
+Addon.settings["tmdbh_max_bitrate"] = "0"
+assert [r["ident"] for r in k.search_and_score_tmdbh(tm)] == ["O1080", "F720", "FSD"]
+Addon.settings.pop("tmdbh_max_bitrate")
+# the auto-play threshold checks the best score, not the first row: in the 1080p mode the 1080p file (95)
+# leads, the 2160p one (97) is still played when only it reaches the threshold
+api.files = [sized("T2160", "Synthetic.Film.2010.2160p.mkv", 10), sized("T1080", "Synthetic.Film.2010.1080p.mkv", 8)]
+Addon.settings.update(tmdbh_auto_play_best="true", tmdbh_auto_play_min_score="96", tmdbh_max_bitrate="0",
+                      tmdbh_prefer_quality="1080p_or_best")
+assert [r["ident"] for r in k.search_and_score_tmdbh(tm)] == ["T1080", "T2160"]
+fresh_details(); log.clear(); k.tmdbh_play(tm)
+assert log[-1] == ("resolved", True, "https://dl/T2160") and not [e for e in log if e[0] == "select"], log
+assert not any("below threshold" in e[1] for e in log if e[0] == "log"), log
+Addon.settings["tmdbh_auto_play_min_score"] = "98"
+fresh_details(); log.clear(); selects[:] = [-1]; k.tmdbh_play(tm)
+assert any("Best score 97 below threshold 98" in e[1] for e in log if e[0] == "log") and ("notif", "CHOOSE") not in log, log
+Addon.settings.update(tmdbh_auto_play_best="", tmdbh_auto_play_min_score="", tmdbh_prefer_quality="720p_or_best")
+Addon.settings.pop("tmdbh_max_bitrate"); api.files = order_files
+# the real bitrate from file_info reorders too: the small 4K file is 50 Mbit/s in fact (a short cut), so it
+# drops below the fitting 1080p one in "highest"; the remux is a 5 h film, so it fits and leads
+Addon.settings.update(tmdbh_prefer_quality="highest", tmdbh_max_bitrate="")
+serve({"SMALL4K": film(size=str(10 * GIB), bitrate="50000000"), "UHD": film(size=str(60 * GIB), length="18000")})
+results = k.search_and_score_tmdbh(tm)
+k._fetch_tmdbh_details(results, len(results), 2, k._details_cache(), fd.Fetcher([], 0))
+k._apply_tmdbh_details(results, tm, k._details_cache())
+assert [r["ident"] for r in results] == ["UHD", "FHD", "SMALL4K", "NOYEAR", "WRONG"], [r["ident"] for r in results]
+assert results[0]["bitrate_estimated"] is False and round(results[0]["bitrate"] / 1e6, 1) == 28.6, results[0]
+Addon.settings.pop("tmdbh_prefer_quality"); Addon.settings.pop("tmdbh_max_bitrate")
+# an episode: 45 min typical, the quality points of a 2160p name are 6 (2 above 1080p) as well
+ep_tm = {"mediatype": "episode", "showname": "Synthetic Show", "season": "1", "episode": "2"}
+api.files = [sized("EUHD", "Synthetic.Show.S01E02.2160p.mkv", 12), sized("EFHD", "Synthetic.Show.S01E02.1080p.mkv", 3)]
+fresh_details()
+assert [r["ident"] for r in k.search_and_score_tmdbh(ep_tm)] == ["EFHD", "EUHD"]  # 12 GB over 45 min: about 38 Mbit/s
+assert round(k.search_and_score_tmdbh(ep_tm)[1]["bitrate"] / 1e6) == 38
+Addon.settings.update(tmdbh_max_bitrate="0", tmdbh_prefer_quality="highest")
+assert [r["ident"] for r in k.search_and_score_tmdbh(ep_tm)] == ["EUHD", "EFHD"]
+Addon.settings.pop("tmdbh_prefer_quality"); Addon.settings.pop("tmdbh_max_bitrate")
+serve(DETAILS)
 groups += 1
 
 # 11. the refresh is final even when top rows stay unknown (a timeout stops the fetching): no new job

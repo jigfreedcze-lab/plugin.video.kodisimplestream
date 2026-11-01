@@ -44,7 +44,10 @@ from resources.lib.matching import (
     build_tmdbh_queries,
     parse_quality,
     parse_size,
+    quality_points,
+    quality_step_down,
     rank_files,
+    QUALITY_ORDER,
     score_episode_result,
     score_movie_result,
 )
@@ -261,6 +264,11 @@ def _source_plot(source: Dict[str, Any], has_preview: bool = False) -> str:
     lines.append(" · ".join(languages))
     lines.append(" · ".join(source[key] for key in ("source_type", "codec", "audio_format") if source.get(key)))
     lines.extend(_details_lines(source))
+    if source.get("bitrate_over") and source.get("bitrate_limit"):
+        # "Bitrate {} is over the auto-play limit ({} Mbit/s)", "≈" for an estimate from the size
+        rate = source_ui.bitrate_text(source.get("bitrate"), bool(source.get("bitrate_estimated")))
+        warning = _addon.getLocalizedString(30081).format(rate, f"{source['bitrate_limit']:g}")
+        lines.append(f"[COLOR {WARNING_COLOR}]{warning}[/COLOR]")
     if has_preview:
         lines.append(_addon.getLocalizedString(30069))  # "Context menu: Video preview"
     return "[CR]".join(line for line in lines if line)
@@ -1082,16 +1090,59 @@ def search_tmdb(label_id: int, search_type: str) -> None:
         list_tmdb_results(results, search_type)
 
 
+# tmdbh_prefer_quality -> preference of the resolutions in the name, for sources of an equal match.
+# "1080p_or_best" is for 1080p: 2160p only after it (still before 720p and SD), see also _quality_adjustment
+QUALITY_PREFERENCES = {
+    "highest": {"2160p": 4, "1080p": 3, "720p": 2, "sd": 1},
+    "720p_or_best": {"2160p": 4, "1080p": 3, "720p": 2},
+    "1080p_or_best": {"1080p": 4, "2160p": 3},
+}
+# The resolution a mode asks for: the match score's quality points above it do not count in the TMDb Helper order
+QUALITY_CAPS = {"1080p_or_best": "1080p"}
+DEFAULT_MAX_BITRATE = 30.0
+
+
+def _quality_mode() -> str:
+    setting = (_addon.getSetting("tmdbh_prefer_quality") or "").strip().lower()
+    return setting if setting in QUALITY_PREFERENCES else "1080p_or_best"
+
+
 def _prefer_quality_value(name: str) -> int:
-    setting = (_addon.getSetting("tmdbh_prefer_quality") or "1080p_or_best").lower()
-    order = {"2160p": 4, "1080p": 3, "720p": 2, "sd": 1}
-    base = order.get(name, 0)
-    if setting == "highest":
-        return base
-    if setting == "720p_or_best":
-        return base if base >= 2 else 0
-    # default 1080p_or_best
-    return base if base >= 3 else 0
+    return QUALITY_PREFERENCES[_quality_mode()].get(name, 0)
+
+
+def _quality_adjustment(name: str, mediatype: str) -> Tuple[int, int]:
+    """Points the TMDb Helper order takes off the match score for the resolution in the name: (excess,
+    over the bitrate limit). excess: the quality points above the resolution the mode asks for (2160p in
+    the 1080p mode: 2), so they do not lift 2160p over 1080p. Over the limit a source also counts one
+    resolution step lower (2-3 points: 1080p as 720p), so a fitting source of the same title match and the
+    same or the next lower resolution comes first; a much worse match (another year, part or episode) never.
+    A larger penalty (all quality points) would put a fitting SD file of the same title match first too, but
+    it would also let wrong files that the score cannot tell from the right ones overtake right files."""
+    cap = QUALITY_CAPS.get(_quality_mode())
+    counted, excess = name, 0
+    if cap and name in QUALITY_ORDER and QUALITY_ORDER.index(name) < QUALITY_ORDER.index(cap):
+        counted, excess = cap, quality_points(name, mediatype) - quality_points(cap, mediatype)
+    return excess, quality_step_down(counted, mediatype)
+
+
+def _max_bitrate() -> float:
+    """Auto-play maximum bitrate in Mbit/s (setting tmdbh_max_bitrate), 0 = no limit."""
+    try:
+        value = float(_addon.getSetting("tmdbh_max_bitrate") or DEFAULT_MAX_BITRATE)
+    except ValueError:
+        return DEFAULT_MAX_BITRATE
+    return value if value > 0 else 0.0
+
+
+def _set_tmdbh_bitrate(result: Dict[str, Any], params: Dict[str, Any], info: Optional[Dict[str, Any]] = None) -> None:
+    """The bitrate of a TMDb Helper source: from file_info when known, else estimated from its size."""
+    result["bitrate"], result["bitrate_estimated"] = file_details.source_bitrate(
+        result.get("size"), info, params.get("mediatype") or "movie", params.get("runtime"))
+
+
+def _over_bitrate(result: Dict[str, Any], limit: Optional[float] = None) -> bool:
+    return file_details.over_bitrate(result.get("bitrate"), _max_bitrate() if limit is None else limit)
 
 
 def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] = None,
@@ -1146,6 +1197,8 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
                 "score": score,
                 "quality_pref": _prefer_quality_value(quality.get("quality", "sd")),
             }
+            item["quality_excess"], item["bitrate_penalty"] = _quality_adjustment(item["quality"], mediatype)
+            _set_tmdbh_bitrate(item, params)  # an estimate until file_info is known
             source = normalize_source(item)
             source["score"] = score
             item["source"] = source
@@ -1173,7 +1226,8 @@ def search_and_score_tmdbh(params: Dict[str, Any], search_query: Optional[str] =
     for it in sorted_items[:10]:
         if debug_scores:
             xbmc.log(
-                f"[KodiSimpleStream] score={it['score']} quality={it['quality']} size={it['size']} name={it['name']}",
+                f"[KodiSimpleStream] score={it['score']} quality={it['quality']} size={it['size']} "
+                f"bitrate={source_ui.bitrate_text(it.get('bitrate'), it.get('bitrate_estimated')) or '?'} name={it['name']}",
                 xbmc.LOGINFO,
             )
     return sorted_items[:max_results] if capped else sorted_items
@@ -1207,12 +1261,18 @@ def _picker_sources(results: List[Dict[str, Any]], min_score: int, expanded: boo
 
 
 def _tmdbh_sort_key(preference: str):
-    """Match score with the language bonus, then the preferred quality and the size (best first, reverse sort)."""
-    return lambda x: (
-        x["score"] + (LANG_PREF_BONUS if matches_language_preference(x["source"], preference) else 0),
-        x["quality_pref"],
-        x["size"],
-    )
+    """Match score with the language bonus, then the preferred quality and the size (best first, reverse sort).
+    The quality points above the mode's resolution do not count and a source over the auto-play bitrate
+    limit counts one resolution step lower (_quality_adjustment): both only reorder sources of the same or
+    nearly the same title match. On equal points a fitting source comes first."""
+    limit = _max_bitrate()
+
+    def key(x: Dict[str, Any]) -> Tuple[Any, ...]:
+        over = _over_bitrate(x, limit)
+        rank = (x["score"] + (LANG_PREF_BONUS if matches_language_preference(x["source"], preference) else 0)
+                - x.get("quality_excess", 0) - (x.get("bitrate_penalty", 0) if over else 0))
+        return rank, not over, x["quality_pref"], x["size"]
+    return key
 
 
 def _fetch_tmdbh_details(results: List[Dict[str, Any]], count: int, deadline: float,
@@ -1239,36 +1299,77 @@ def _fetch_tmdbh_details(results: List[Dict[str, Any]], count: int, deadline: fl
 
 
 def _apply_tmdbh_details(results: List[Dict[str, Any]], params: Dict[str, Any], cache: file_details.DetailsCache) -> None:
-    """Known details on the sources (real resolution, length, audio) and the order again: a CZE track
-    counts for the Czech dub preference. Without details nothing changes."""
+    """Known details on the sources (real resolution, length, audio, bitrate) and the order again: a CZE
+    track counts for the Czech dub preference, the real bitrate for the limit. Without details nothing changes."""
     runtime = file_details.runtime_minutes(params.get("runtime"))
     mediatype = (params.get("mediatype") or "movie").lower()
     changed = False
     for result in results:
         info = cache.get(result["ident"])
-        if not info:
+        if not info or result.get("details") is info:
             continue
         plain = {key: value for key, value in result.items() if key not in ("source", "details")}
         source = normalize_source(_with_details(plain, info))
         source["score"] = result["score"]
         result["source"] = _apply_details(source, info, runtime, mediatype)
         result["details"] = info
+        _set_tmdbh_bitrate(result, params, info)
         changed = True
     if changed:
         results.sort(key=_tmdbh_sort_key(language_preference()), reverse=True)  # stable
 
 
 def _autoplay_rejection(result: Dict[str, Any], params: Dict[str, Any]) -> str:
-    """Why the auto-play must not take this file: a trailer/sample, a part, another year (matching.autoplay_concern)
-    or a length far off the runtime; "" when it may be played. An unknown length is no reason (12 % of files
-    are not analysed, file_info may be late), a known runtime is needed for the length check."""
+    """Why the auto-play must not take this file: a trailer/sample, a part, another year (matching.autoplay_concern),
+    a length far off the runtime or a bitrate over the limit (tmdbh_max_bitrate); "" when it may be played.
+    An unknown length is no reason (12 % of files are not analysed, file_info may be late), a known runtime is
+    needed for the length check. The bitrate is the real one from file_info or, without it, the estimate
+    from the size: a file estimated over the limit is not started without asking either."""
     concern = autoplay_concern(result, params)
     if concern:
         return concern
     runtime = file_details.runtime_minutes(params.get("runtime"))
     if file_details.length_mismatch(result.get("details"), runtime, params.get("mediatype") or "movie"):
         return "length"
+    if _over_bitrate(result):
+        return "bitrate"
     return ""
+
+
+def _autoplay_candidates(results: List[Dict[str, Any]], limit: float) -> List[Dict[str, Any]]:
+    """The rows the auto-play checks, in order: AUTOPLAY_COUNT slots within what the picker would list
+    (the first tmdbh_max_results). Every row takes a slot like before, except one over the bitrate limit:
+    it is checked (and rejected) without using up a slot, so the next fitting row further down still gets one.
+    The rows stay bounded by the picker's list; with the limit off (0) it is the first AUTOPLAY_COUNT rows."""
+    candidates: List[Dict[str, Any]] = []
+    slots = file_details.AUTOPLAY_COUNT
+    for result in results[:_max_tmdbh_results()]:
+        if slots <= 0:
+            break
+        candidates.append(result)
+        if not _over_bitrate(result, limit):
+            slots -= 1
+    return candidates
+
+
+def _fetch_autoplay_details(results: List[Dict[str, Any]], params: Dict[str, Any], limit: float,
+                            cache: file_details.DetailsCache, fetcher: file_details.Fetcher) -> None:
+    """file_info of the auto-play candidates within one AUTOPLAY_DEADLINE, at most AUTOPLAY_FETCH_MAX requests.
+    The details can change the candidates: a real bitrate over the limit frees a slot for the next row, one
+    under it (a long film estimated over) takes one, a CZE track moves a row up; the new rows get their
+    details in a next round while time is left. Rows without details are judged by the name and the estimate."""
+    end = time.monotonic() + file_details.AUTOPLAY_DEADLINE
+    asked: set = set()  # requested in this check (cached details cost no request)
+    while len(asked) < file_details.AUTOPLAY_FETCH_MAX:
+        new = [result for result in _autoplay_candidates(results, limit)
+               if result["ident"] not in asked and not cache.known(result["ident"])]
+        new = new[:file_details.AUTOPLAY_FETCH_MAX - len(asked)]
+        remaining = end - time.monotonic()
+        if not new or remaining <= 0:
+            return
+        asked.update(result["ident"] for result in new)
+        _fetch_tmdbh_details(new, len(new), remaining, cache, fetcher)
+        _apply_tmdbh_details(results, params, cache)
 
 
 def play_ident(ident: str) -> None:
@@ -1311,6 +1412,11 @@ def play_ident(ident: str) -> None:
 def _tmdbh_source(result: Dict[str, Any]) -> Dict[str, Any]:
     source = result.get("source") or normalize_source(result)
     source["score"] = result.get("score", source.get("score"))
+    # Listed even over the auto-play bitrate limit (the user may choose it), marked orange (source_ui.bitrate_part)
+    limit = _max_bitrate()
+    source["bitrate"], source["bitrate_estimated"] = result.get("bitrate"), bool(result.get("bitrate_estimated"))
+    source["bitrate_over"] = _over_bitrate(result, limit)
+    source["bitrate_limit"] = limit
     return source
 
 
@@ -1492,25 +1598,27 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
         return
 
     min_score = int(_addon.getSetting("tmdbh_auto_play_min_score") or "80")
-    # The whole list comes for the picker filter; auto-play still looks only at what the picker would list
-    candidates = min(file_details.AUTOPLAY_COUNT, _max_tmdbh_results())
-    best = results[0]
+    # The highest match score the auto-play may look at: not results[0], the order lowers a 2160p row in the
+    # 1080p mode and a row over the bitrate limit below rows of a slightly lower score
+    best_score = max(result["score"] for result in results[:max(1, _max_tmdbh_results())])
     cache = _details_cache()
     fetcher = file_details.Fetcher([], 0)  # one for the check and the picker after it
-    if best["score"] < min_score:
-        xbmc.log(f"[KodiSimpleStream] Best score {best['score']} below threshold {min_score}, showing source picker", xbmc.LOGINFO)
+    if best_score < min_score:
+        xbmc.log(f"[KodiSimpleStream] Best score {best_score} below threshold {min_score}, showing source picker", xbmc.LOGINFO)
         # The picker shows the same sources, no second search
         select_tmdbh_source(params, results, cache, fetcher)
         return
 
+    limit = _max_bitrate()
     # Details only when they can change the choice: the length check needs the runtime (TMDb Helper does
-    # not pass one, see docs/tmdbhelper), a CZE track the Czech dub preference
-    if file_details.runtime_minutes(params.get("runtime")) or language_preference() == "cz_audio":
-        _fetch_tmdbh_details(results, candidates, file_details.AUTOPLAY_DEADLINE, cache, fetcher)
-    _apply_tmdbh_details(results, params, cache)
-    # The first of the best candidates above the threshold that is not a trailer, a part, another year
-    # or of a wrong length; none -> the picker, never a doubtful file
-    for candidate in results[:candidates]:
+    # not pass one, see docs/tmdbhelper), a CZE track the Czech dub preference, the limit the real bitrate
+    wanted = bool(file_details.runtime_minutes(params.get("runtime")) or language_preference() == "cz_audio" or limit)
+    _apply_tmdbh_details(results, params, cache)  # the cached ones first: they decide which rows are candidates
+    if wanted:
+        _fetch_autoplay_details(results, params, limit, cache, fetcher)
+    # The first of the best candidates above the threshold that is not a trailer, a part, another year,
+    # of a wrong length or over the bitrate limit; none -> the picker, never a doubtful file
+    for candidate in _autoplay_candidates(results, limit):
         if candidate["score"] < min_score:
             continue
         rejection = _autoplay_rejection(candidate, params)
@@ -1518,7 +1626,10 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
             xbmc.log(f"[KodiSimpleStream] Autoplaying source score={candidate['score']} name={candidate['name']}", xbmc.LOGINFO)
             play_ident(candidate["ident"])
             return
-        xbmc.log(f"[KodiSimpleStream] Autoplay skips ({rejection}) score={candidate['score']} name={candidate['name']}", xbmc.LOGINFO)
+        rate = ""
+        if rejection == "bitrate":
+            rate = f" bitrate={source_ui.bitrate_text(candidate.get('bitrate'), candidate.get('bitrate_estimated'))}"
+        xbmc.log(f"[KodiSimpleStream] Autoplay skips ({rejection}) score={candidate['score']}{rate} name={candidate['name']}", xbmc.LOGINFO)
 
     xbmcgui.Dialog().notification(
         _addon.getAddonInfo("name"),

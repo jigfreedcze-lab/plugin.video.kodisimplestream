@@ -32,7 +32,9 @@ python -X utf8 tools/benchmark/evaluate.py --compare tools/benchmark/results/cur
 ```
 
 - `--split train|holdout|all`, `--flow a|b|both`, `--per-case` (podrobnosti po případech, včetně top 10)
-- `--preference cz_audio|cz_subs`, `--tmdbh-quality …` – nastavení doplňku
+- `--preference cz_audio|cz_subs`, `--tmdbh-quality …`, `--tmdbh-max-bitrate 30` – nastavení doplňku
+  (limit datového toku pro tok b, výchozí 30 jako v doplňku, 0 = bez limitu; datový tok se odhaduje z velikosti,
+  snímek nemá údaje file_info k výsledkům hledání)
 - `--public-json results/<název>.json` – uloží výsledky bez názvů souborů (do repozitáře)
 - `--json <soubor>` – úplné výsledky včetně názvů souborů (**necommitovat**)
 
@@ -45,6 +47,11 @@ První holdout je téměř nasycený a poslední úprava řazení vznikla po poh
 jména, krátké názvy, originály v jiném písmu, pokračování a remaky. Sestavil se až po změnách řazení z issue #6
 a štítky k němu udělali nezávislí štítkovači jen podle názvů souborů, bez znalosti skórování
 (`labels_holdout2.json` v soukromém repozitáři). **Na druhém holdoutu se neladí**, slouží jen ke kontrole.
+
+Výjimka: velikost srážky za datový tok nad limitem v řazení toku b (o jeden stupeň rozlišení, ne všechny body
+za kvalitu) byla zvolena až po pohledu na druhý holdout (větší srážka zhoršila jednu jeho epizodu). Pro pravidla
+řazení podle kvality a datového toku proto druhý holdout už není slepá kontrola; jejich další změny ověřte i na
+nových, dosud neviděných případech.
 
 ```
 python -X utf8 tools/benchmark/build_benchmark.py --set holdout2 all

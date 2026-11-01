@@ -283,3 +283,11 @@ msgstr "Žádný zdroj nedosahuje minimálního skóre (skryto: {})"
 msgctxt "#30079"
 msgid "Animated preview of the focused file (Wide list view)"
 msgstr "Animovaný náhled vybraného souboru (zobrazení Wide list)"
+
+msgctxt "#30080"
+msgid "Auto-play maximum bitrate (Mbit/s, 0 = no limit)"
+msgstr "Maximální datový tok pro automatické přehrání (Mbit/s, 0 = bez omezení)"
+
+msgctxt "#30081"
+msgid "Bitrate {} is over the auto-play limit ({} Mbit/s)"
+msgstr "Datový tok {} je nad limitem automatického přehrání ({} Mbit/s)"
