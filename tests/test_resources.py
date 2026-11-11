@@ -67,8 +67,12 @@ def test_tmdbhelper_player_uses_known_keys():
     # The picker player: the main one plus &select=1, its own name and the next priority (TMDb Helper sorts
     # by priority; the user's default player is bound to the file name kodisimplestream.json)
     main, select = players["kodisimplestream.json"], players["kodisimplestream_select.json"]
-    assert set(main) == set(select), sorted(set(main) ^ set(select))
+    # make_playlist (Up Next) is only on the main player: the picker player does not queue the next episode
+    assert set(main) - {"make_playlist"} == set(select), sorted(set(main) ^ set(select))
+    assert "make_playlist" not in select
     for key in main:
+        if key == "make_playlist":
+            continue
         if key in ("play_movie", "play_episode"):
             assert select[key] == main[key] + "&select=1", key
         elif key == "name":

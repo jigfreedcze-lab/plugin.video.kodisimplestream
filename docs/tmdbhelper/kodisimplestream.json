@@ -3,6 +3,7 @@
   "plugin": "plugin.video.kodisimplestream",
   "priority": 500,
   "is_resolvable": "true",
+  "make_playlist": "upnext",
   "assert": {
     "play_movie": [
       "title"
