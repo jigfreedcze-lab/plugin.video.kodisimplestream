@@ -110,6 +110,73 @@ Když se cokoli nepovede, zůstane statický náhled. Vypíná se v nastavení *
 - Aktivní účet na Webshare.cz
 - Volitelně [TMDb Helper](#tmdb-helper-integrace): otestováno s verzí **5.4.16** z oficiálního repozitáře Kodi. Řada 6.x z repozitáře autora TMDb Helperu zatím vyzkoušená není.
 
+### Dětské hledání
+Hledání filmů a seriálů v TMDb, které pustí jen tituly vhodné pro dítě daného věku. Celé běží uvnitř doplňku,
+TMDb Helper se nijak neupravuje. Potřebuje TMDb API klíč. V hlavním menu jsou položky **Hledat vše**, **Hledat filmy** a **Hledat seriály**; hledá filmy
+i seriály (`?action=kids_search`, volitelně `type=movie|tv|both` a `query=...`, bez dotazu se zeptá klávesnicí).
+Nad výsledky je položka **Nové hledání**, která nahradí aktuální seznam.
+
+Nastavení (sekce **Dětské hledání**):
+- **Věk dítěte** (`kids_age`, výchozí 8, povolené 3 až 18) – tituly s vyšším věkovým hodnocením se nezobrazí.
+  Všechno ostatní se odvodí z tohoto čísla.
+- **Přísnost** (`kids_percentile`, výchozí 75, povolené 50 až 100) – hodnocení se nejdřív sloučí po zemích (za každou
+  zemi platí její nejpřísnější) a vybere se uvedený percentil těchto věků: 100 = rozhoduje nejpřísnější země, 50 =
+  medián. Má-li titul méně než 5 zemí, platí vždy nejpřísnější. **Je to vědomé rozhodnutí:** při výchozích 75 se
+  nejpřísnější čtvrtina zemí ignoruje, aby jedna odlehlá země (např. CH 12, chyba v datech) nevyřadila běžnou pohádku.
+  Důsledek je, že titul, který jedna země hodnotí výrazně přísněji (třeba USA R), může projít, když ho většina zemí
+  pouští dětem. Kdo to nechce, nastaví 100 (rozhoduje nejpřísnější země).
+- **Řazení výsledků** (`kids_sort`: relevance (pořadí z TMDb) / popularita / hodnocení / rok vydání, výchozí relevance) a **Nejvíce výsledků**
+  (`kids_limit`, výchozí 20, povolené 5 až 60) – týká se jen dětského hledání, ne řazení souborů na Webshare (`ws_sort`).
+- **Minimum hlasů** (`kids_min_votes`, výchozí 20) – titul s méně hlasy na TMDb se skryje, 0 = bez omezení.
+- **Tituly bez věkového hodnocení** (`kids_unrated`: zakázat / povolit, výchozí zakázat) – co se stane s titulem,
+  u kterého TMDb nezná žádné použitelné hodnocení.
+- **Kids mode** (`kids_only`, vypnuto) – doplněk nabídne jen dětské hledání a odmítne všechno ostatní kromě
+  přehrání z TMDb Helperu (hledání na Webshare i v TMDb, výběr titulu, epizody, náhledy, detaily souborů, přímé
+  přehrání). V tomto režimu se nikdy neukáže ani výběr zdroje.
+- **Nikdy nezobrazovat výběr zdroje** (`tmdbh_no_picker`, vypnuto; sekce TMDb Helper) – ať přehrávač pro TMDb Helper
+  výběr zdroje neotevře nikdy: ignoruje i druhý přehrávač „výběr zdroje“, auto-play se použije vždy a když žádný zdroj
+  nevyhovuje, zobrazí upozornění a přehrání skončí. Hodí se pro děti, které by si neuměly vybrat.
+
+Jak se věk titulu odvodí:
+- Doplněk má vestavěnou tabulku „hodnocení -> minimální věk“ pro CZ, SK, DE, AT, CH, US, GB, FR, ES, IT, NL, SE, NO,
+  DK, FI, CA (včetně CA-QC) a BR, ještě AU, NZ, IE, PL a HU (jedna tabulka na zemi, platí pro filmy i seriály). Bere se hodnocení **ze všech těchto zemí** (z TMDb: datumy vydání filmu, hodnocení seriálu). Za každou zemi platí její
+  nejpřísnější hodnocení a z věků zemí se vybere percentil podle nastavení **Přísnost** (výchozí 75). Titul projde, jen
+  když vybraný věk není vyšší než věk dítěte. Má-li titul méně než 5 zemí, platí nejpřísnější. Hodnocení zemí mimo tabulku se při výpočtu věku ignoruje, ale titul, který má hodnocení jen v takových
+  zemích, se nepovažuje za nehodnocený a vyřadí se (i při povolení nehodnocených titulů).
+- Značky „bez hodnocení“ (NR, UR, Unrated, prázdné hodnocení) věk nenesou a ignorují se. Pokud nezbude žádné
+  hodnocení, rozhoduje **Tituly bez věkového hodnocení**.
+- Chybějící nebo porušený údaj o žánrech (nebo o počtu hlasů) titul vyřadí.
+- Hodnocení ze země z tabulky, které tabulka nezná a není to značka „bez hodnocení“, titul vyřadí (nic se
+  nehádá).
+
+| Země | Příklady (hodnocení = minimální věk) |
+|------|--------------------------------------|
+| CZ | film U = 0, 12+ = 12, 15+ = 15, 18+ = 18; seriál 0+, 5+, 7+, 9+, 12+, 15+, 18+ |
+| DE | 0, 6, 12, 16, 18 |
+| US | film G = 0, PG = 8, PG-13 = 13, R = 17, NC-17 = 18; seriál TV-Y = 0, TV-Y7 = 7, TV-G = 0, TV-PG = 8, TV-14 = 14, TV-MA = 17 |
+| GB | U = 0, PG = 8, 12A = 12, 12 = 12, 15 = 15, 18 = 18 |
+| CA | G = 0, PG = 8, 14A = 14, 18A = 18, R = 18 |
+
+Další pravidla (první, které titul vyřadí, rozhoduje):
+1. Titul pro dospělé se vyřadí.
+2. Zakázané žánry podle věku: do 11 let horor, thriller, krimi, válečný, mysteriózní a „válka a politika“;
+   od 12 do 15 let horor a válečný; od 16 let žádné. Povolené žánry ani jazyk se nevyžadují.
+3. Titul s méně než 20 hlasy na TMDb se vyřadí.
+
+Výsledek se vypíše jako `Název (rok)  [6+]` (věk, který titulu vyšel, jen když je znám). Film se po výběru přehraje
+přes `plugin://plugin.video.themoviedb.helper/?info=play&tmdb_type=movie&tmdb_id=<id>`, seriál otevře řady přes
+`plugin://plugin.video.themoviedb.helper/?info=seasons&tmdb_type=tv&tmdb_id=<id>`; hledání zdroje na Webshare
+pak dělá přehrávač KodiSimpleStream z [TMDb Helper integrace](#tmdb-helper-integrace).
+
+Omezení:
+- TMDb nemá věkové hodnocení u všech titulů (zvlášť u starších a českých). Takový titul se ve výchozím nastavení
+  nezobrazí; po povolení **Tituly bez věkového hodnocení** projdou i nehodnocené tituly, třeba pro dospělé.
+- Údaje na TMDb (žánry, hodnocení) nejsou dokonalé a špatné hodnocení z jedné země titul zablokuje. Filtr je
+  pomůcka, ne záruka. Spolehlivý seznam jsou oblíbené položky (Favourites), které si rodič vybere sám.
+- Filtr platí jen pro dětské hledání doplňku. Titul, který dětský režim nepustil, jde dál najít v samotném
+  TMDb Helperu nebo v jiných doplňcích. Zámek nastavení Kodi, profilu, rodičovskou kontrolu a skrytí položek v
+  tapetě (skinu) nastavuje Kodi a skin, tento doplněk je nenahrazuje.
+
 ### Podpora
 Pokud narazíte na problémy nebo máte otázky:
 - Prohlédněte si [Issues](https://github.com/jigfreedcze-lab/plugin.video.kodisimplestream/issues)

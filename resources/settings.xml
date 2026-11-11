@@ -16,6 +16,7 @@
         <setting label="30019" type="number" id="tmdbh_auto_play_min_score" default="80" />
         <setting label="30080" type="number" id="tmdbh_max_bitrate" default="30" />
         <setting label="30076" type="number" id="tmdbh_picker_min_score" default="50" />
+        <setting label="30102" type="bool" id="tmdbh_no_picker" default="false" />
         <setting label="30020" type="number" id="tmdbh_max_results" default="20" />
         <setting label="30021" type="text" id="tmdbh_prefer_quality" default="1080p_or_best" />
         <setting label="30022" type="bool" id="tmdbh_show_debug_scores" default="false" />
@@ -23,5 +24,14 @@
     <category label="30052">
         <setting label="30057" type="lsep" />
         <setting label="30050" type="text" id="tmdb_api_key" option="hidden" default="" />
+    </category>
+    <category label="30090">
+        <setting label="30091" type="bool" id="kids_only" default="false" />
+        <setting label="30092" type="number" id="kids_age" default="8" />
+        <setting label="30099" type="enum" id="kids_unrated" lvalues="30104|30105" default="0" />
+        <setting label="30130" type="number" id="kids_min_votes" default="20" />
+        <setting label="30131" type="number" id="kids_percentile" default="75" />
+        <setting label="30132" type="enum" id="kids_sort" lvalues="30140|30133|30134|30135" default="0" />
+        <setting label="30136" type="number" id="kids_limit" default="20" />
     </category>
 </settings>

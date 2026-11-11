@@ -291,3 +291,101 @@ msgstr "Auto-play maximum bitrate (Mbit/s, 0 = no limit)"
 msgctxt "#30081"
 msgid "Bitrate {} is over the auto-play limit ({} Mbit/s)"
 msgstr "Bitrate {} is over the auto-play limit ({} Mbit/s)"
+
+msgctxt "#30090"
+msgid "Kids search"
+msgstr "Kids search"
+
+msgctxt "#30091"
+msgid "Kids mode: the add-on offers only the kids search"
+msgstr "Kids mode: the add-on offers only the kids search"
+
+msgctxt "#30092"
+msgid "Age of the child (titles with a higher age rating are hidden)"
+msgstr "Age of the child (titles with a higher age rating are hidden)"
+
+
+msgctxt "#30099"
+msgid "Titles without an age rating"
+msgstr "Titles without an age rating"
+
+
+msgctxt "#30102"
+msgid "Never show the source picker (TMDb Helper)"
+msgstr "Never show the source picker (TMDb Helper)"
+
+msgctxt "#30104"
+msgid "Deny"
+msgstr "Deny"
+
+msgctxt "#30105"
+msgid "Allow"
+msgstr "Allow"
+
+msgctxt "#30107"
+msgid "Kids search"
+msgstr "Kids search"
+
+msgctxt "#30108"
+msgid "Kids search: title"
+msgstr "Kids search: title"
+
+msgctxt "#30109"
+msgid "No suitable titles found"
+msgstr "No suitable titles found"
+
+msgctxt "#30110"
+msgid "Not available in kids mode"
+msgstr "Not available in kids mode"
+
+msgctxt "#30111"
+msgid "No suitable source found"
+msgstr "No suitable source found"
+
+msgctxt "#30126"
+msgid "New search"
+msgstr "New search"
+
+msgctxt "#30130"
+msgid "Minimum TMDb votes (fewer votes = title hidden; 0 = no limit)"
+msgstr "Minimum TMDb votes (fewer votes = title hidden; 0 = no limit)"
+
+msgctxt "#30131"
+msgid "Strictness: percentile of country ages (50 = median, 100 = the strictest country decides)"
+msgstr "Strictness: percentile of country ages (50 = median, 100 = the strictest country decides)"
+
+msgctxt "#30132"
+msgid "Kids search: order of results"
+msgstr "Kids search: order of results"
+
+msgctxt "#30133"
+msgid "Popularity"
+msgstr "Popularity"
+
+msgctxt "#30134"
+msgid "Rating"
+msgstr "Rating"
+
+msgctxt "#30135"
+msgid "Release year (newest first)"
+msgstr "Release year (newest first)"
+
+msgctxt "#30136"
+msgid "Kids search: most results (5 to 60)"
+msgstr "Kids search: most results (5 to 60)"
+
+msgctxt "#30137"
+msgid "Search everything"
+msgstr "Search everything"
+
+msgctxt "#30138"
+msgid "Search movies"
+msgstr "Search movies"
+
+msgctxt "#30139"
+msgid "Search series"
+msgstr "Search series"
+
+msgctxt "#30140"
+msgid "Relevance (TMDb order)"
+msgstr "Relevance (TMDb order)"

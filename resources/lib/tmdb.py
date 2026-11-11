@@ -154,3 +154,26 @@ class TMDB:
             })
         episodes.sort(key=lambda x: x['number'] or 0)
         return episodes
+
+    # --- kids search helpers (raw TMDb data) ---
+
+    def search_raw(self, query: str, kind: str, page: int = 1) -> List[Dict]:
+        """Raw TMDb search results of search/{movie|tv} without adult titles."""
+        if kind not in ("movie", "tv"):
+            raise ValueError(f"Invalid TMDb kind: {kind}")
+        data = self._get(f"search/{kind}", query=query, include_adult="false", page=page)
+        return data.get("results", [])
+
+    def details_with_ratings(self, kind: str, tmdb_id) -> Dict:
+        """Details with certifications appended: release_dates (movie) or content_ratings (tv)."""
+        if kind not in ("movie", "tv"):
+            raise ValueError(f"Invalid TMDb kind: {kind}")
+        append = "release_dates" if kind == "movie" else "content_ratings"
+        return self._get(f"{kind}/{tmdb_id}", append_to_response=append)
+
+    def details_extras(self, kind: str, tmdb_id) -> Dict:
+        """Posters and translations of a title (heavy, so only for titles that are listed)."""
+        if kind not in ("movie", "tv"):
+            raise ValueError(f"Invalid TMDb kind: {kind}")
+        # images in Czech, then English, then language-less ones (otherwise TMDb shows the original, e.g. Japanese, poster)
+        return self._get(f"{kind}/{tmdb_id}", append_to_response="images,translations", include_image_language="cs,en,null")

@@ -291,3 +291,101 @@ msgstr "Maximální datový tok pro automatické přehrání (Mbit/s, 0 = bez om
 msgctxt "#30081"
 msgid "Bitrate {} is over the auto-play limit ({} Mbit/s)"
 msgstr "Datový tok {} je nad limitem automatického přehrání ({} Mbit/s)"
+
+msgctxt "#30090"
+msgid "Kids search"
+msgstr "Dětské hledání"
+
+msgctxt "#30091"
+msgid "Kids mode: the add-on offers only the kids search"
+msgstr "Dětský režim: doplněk nabízí jen dětské hledání"
+
+msgctxt "#30092"
+msgid "Age of the child (titles with a higher age rating are hidden)"
+msgstr "Věk dítěte (tituly s vyšším věkovým hodnocením se nezobrazí)"
+
+
+msgctxt "#30099"
+msgid "Titles without an age rating"
+msgstr "Tituly bez věkového hodnocení"
+
+
+msgctxt "#30102"
+msgid "Never show the source picker (TMDb Helper)"
+msgstr "Nikdy nezobrazovat výběr zdroje (TMDb Helper)"
+
+msgctxt "#30104"
+msgid "Deny"
+msgstr "Zakázat"
+
+msgctxt "#30105"
+msgid "Allow"
+msgstr "Povolit"
+
+msgctxt "#30107"
+msgid "Kids search"
+msgstr "Dětské hledání"
+
+msgctxt "#30108"
+msgid "Kids search: title"
+msgstr "Dětské hledání: název"
+
+msgctxt "#30109"
+msgid "No suitable titles found"
+msgstr "Nenalezeny žádné vhodné tituly"
+
+msgctxt "#30110"
+msgid "Not available in kids mode"
+msgstr "V dětském režimu není dostupné"
+
+msgctxt "#30111"
+msgid "No suitable source found"
+msgstr "Nenalezen vhodný zdroj"
+
+msgctxt "#30126"
+msgid "New search"
+msgstr "Nové hledání"
+
+msgctxt "#30130"
+msgid "Minimum TMDb votes (fewer votes = title hidden; 0 = no limit)"
+msgstr "Nejméně hlasů na TMDb (méně hlasů = titul se skryje; 0 = bez omezení)"
+
+msgctxt "#30131"
+msgid "Strictness: percentile of country ages (50 = median, 100 = the strictest country decides)"
+msgstr "Přísnost: percentil věků zemí (50 = medián, 100 = rozhoduje nejpřísnější země)"
+
+msgctxt "#30132"
+msgid "Kids search: order of results"
+msgstr "Řazení výsledků dětského hledání"
+
+msgctxt "#30133"
+msgid "Popularity"
+msgstr "Popularita"
+
+msgctxt "#30134"
+msgid "Rating"
+msgstr "Hodnocení"
+
+msgctxt "#30135"
+msgid "Release year (newest first)"
+msgstr "Rok vydání (nejnovější první)"
+
+msgctxt "#30136"
+msgid "Kids search: most results (5 to 60)"
+msgstr "Nejvíce výsledků v dětském hledání (5 až 60)"
+
+msgctxt "#30137"
+msgid "Search everything"
+msgstr "Hledat vše"
+
+msgctxt "#30138"
+msgid "Search movies"
+msgstr "Hledat filmy"
+
+msgctxt "#30139"
+msgid "Search series"
+msgstr "Hledat seriály"
+
+msgctxt "#30140"
+msgid "Relevance (TMDb order)"
+msgstr "Relevance (pořadí z TMDb)"

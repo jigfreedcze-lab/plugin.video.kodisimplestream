@@ -24,7 +24,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 
-from resources.lib import file_details, preview, source_ui
+from resources.lib import file_details, kids, preview, source_ui
 from resources.lib.webshare import WebshareAPI, WebshareError, WebshareStatusError
 from resources.lib.tmdb import TMDB, TMDBAuthError
 from resources.lib.source_ui import (
@@ -670,26 +670,50 @@ def get_tmdb() -> Optional[TMDB]:
         )
         return None
 
+def _without_api_key(text: str) -> str:
+    """requests puts the whole URL, with ?api_key=..., into connection errors: never show the key on the screen."""
+    text = re.sub(r"(api_key=)[^&\s'\")]+", r"\g<1>***", text)
+    key = _addon.getSetting("tmdb_api_key").strip()
+    return text.replace(key, "***") if key else text
+
 def show_tmdb_error(exc: Exception) -> None:
     """Notifies about a failed TMDb request and closes the current directory."""
     if isinstance(exc, TMDBAuthError):
         message = _addon.getLocalizedString(30053)  # "TMDb rejected the API key…"
     else:
-        message = _addon.getLocalizedString(30007).format(str(exc))
+        message = _addon.getLocalizedString(30007).format(_without_api_key(str(exc)))
     xbmcgui.Dialog().notification(
         _addon.getAddonInfo("name"),
         message,
         xbmcgui.NOTIFICATION_ERROR,
         5000,
     )
-    xbmcplugin.endOfDirectory(_handle, succeeded=False)
+    if _handle >= 0:  # a script call (handle -1) has no directory
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
 
 # ----------------------------------------------------------------------------
 # Root menu
 # ----------------------------------------------------------------------------
 
+def _flag(name: str) -> bool:
+    """True when the boolean setting is on (Kodi returns "true"/"false" as text)."""
+    return _addon.getSetting(name) == "true"
+
+def _add_kids_search_items() -> None:
+    """The three kids search entries: everything, movies only, series only."""
+    for kind, label_id in (("both", 30137), ("movie", 30138), ("tv", 30139)):
+        item = xbmcgui.ListItem(label=_addon.getLocalizedString(label_id))
+        item.setArt({"icon": "DefaultAddonsSearch.png"})
+        url = get_url(action="kids_search", **({"type": kind} if kind != "both" else {}))
+        xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=True)
+
 def list_categories() -> None:
     """Creates items for the plugin's main menu."""
+    if _flag("kids_only"):
+        # Kids mode: nothing but the kids search (the router refuses the other actions as well)
+        _add_kids_search_items()
+        xbmcplugin.endOfDirectory(_handle)
+        return
     menu = [("search_webshare", 30011, "DefaultAddonsSearch.png", True)]
     # TMDb is optional – without an API key offer setup instead of the TMDb searches
     if _addon.getSetting("tmdb_api_key").strip():
@@ -705,6 +729,7 @@ def list_categories() -> None:
         item = xbmcgui.ListItem(label=_addon.getLocalizedString(label_id))
         item.setArt({"icon": icon})
         xbmcplugin.addDirectoryItem(_handle, get_url(action=action), item, isFolder=is_folder)
+    _add_kids_search_items()
 
     xbmcplugin.endOfDirectory(_handle)
 
@@ -1088,6 +1113,83 @@ def search_tmdb(label_id: int, search_type: str) -> None:
             show_tmdb_error(exc)
             return
         list_tmdb_results(results, search_type)
+
+
+# ----------------------------------------------------------------------------
+# Kids search: TMDb search filtered by the age of the child (resources/lib/kids.py)
+# ----------------------------------------------------------------------------
+
+TMDBH_URL = "plugin://plugin.video.themoviedb.helper/"
+
+def _kids_config() -> kids.KidsConfig:
+    """The age of the child and the policy for unrated titles (settings kids_age, kids_unrated)."""
+    return kids.config_from_settings(_addon.getSetting)
+
+def kids_item_path(result: Dict[str, Any]) -> Tuple[str, bool]:
+    """TMDb Helper path of a kids search result and whether it is a folder (a series opens its seasons, a movie plays)."""
+    tmdb_id = str(result["id"]).partition(":")[2] or str(result["id"])
+    if result["kind"] == "movie":
+        return f"{TMDBH_URL}?info=play&tmdb_type=movie&tmdb_id={tmdb_id}", False
+    return f"{TMDBH_URL}?info=seasons&tmdb_type=tv&tmdb_id={tmdb_id}", True
+
+def list_kids_results(results: List[Dict[str, Any]], kind: str = "both", replace: bool = False) -> None:
+    """Lists the allowed titles under a "New search" entry (a search from the results, no way back needed)."""
+    new_search = xbmcgui.ListItem(label=_addon.getLocalizedString(30126))  # "New search"
+    new_search.setArt({"icon": "DefaultAddonsSearch.png", "thumb": "DefaultAddonsSearch.png"})
+    search_url = get_url(action="kids_search", **({"type": kind} if kind in ("movie", "tv") else {}), replace=1)
+    xbmcplugin.addDirectoryItem(_handle, search_url, new_search, isFolder=True)
+    for result in results:
+        title = result.get("title") or ""
+        year = result.get("year")
+        label = f"{title} ({year})" if year else title
+        if result.get("certification"):
+            label += f"  [{result['certification']}]"
+        item = xbmcgui.ListItem(label=label)
+        info = {"title": title, "plot": result.get("plot"), "rating": result.get("rating"),
+                "mediatype": "movie" if result["kind"] == "movie" else "tvshow"}
+        if year:
+            info["year"] = year
+        item.setInfo("video", info)
+        poster = result.get("poster") or ""
+        item.setArt({"poster": poster, "fanart": poster, "thumb": poster})
+        path, is_folder = kids_item_path(result)
+        if not is_folder:
+            item.setProperty("IsPlayable", "true")
+        xbmcplugin.addDirectoryItem(_handle, path, item, isFolder=is_folder)
+    if replace:
+        # A search started from the results takes their place in the history
+        xbmcplugin.endOfDirectory(_handle, updateListing=True)
+    else:
+        xbmcplugin.endOfDirectory(_handle)
+
+def kids_search(kind: str = "both", query: str = "", replace: bool = False) -> None:
+    """Searches TMDb and lists only the titles the kids settings allow; the items open in TMDb Helper."""
+    kinds = ["movie", "tv"] if kind not in ("movie", "tv") else [kind]
+    tmdb = get_tmdb()
+    if not tmdb:
+        if _handle >= 0:  # no API key: close the folder, otherwise Kodi keeps waiting for the listing
+            xbmcplugin.endOfDirectory(_handle, succeeded=False)
+        return
+    query = (query or "").strip()
+    if not query:
+        query = (_keyboard_search(30108) or "").strip()
+        if not query:
+            xbmcplugin.endOfDirectory(_handle, succeeded=False)
+            return
+    cfg = _kids_config()
+    try:
+        results = kids.search_safe(tmdb, query, kinds, cfg)
+    except Exception as exc:
+        show_tmdb_error(exc)
+        return
+    if not results:
+        xbmcgui.Dialog().notification(
+            _addon.getAddonInfo("name"),
+            _addon.getLocalizedString(30109),  # "No suitable titles found"
+            xbmcgui.NOTIFICATION_INFO,
+            3000,
+        )
+    list_kids_results(results, kind, replace)
 
 
 # tmdbh_prefer_quality -> preference of the resolutions in the name, for sources of an equal match.
@@ -1587,6 +1689,22 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
     xbmcplugin.endOfDirectory(_handle)
 
 
+def _no_picker() -> bool:
+    """The source picker (a list of raw file names) is never shown: tmdbh_no_picker, and always in kids mode."""
+    return _flag("tmdbh_no_picker") or _flag("kids_only")
+
+
+def _no_source_found() -> None:
+    """tmdbh_no_picker: the picker is never shown, a source that is not good enough means a failed playback."""
+    xbmcgui.Dialog().notification(
+        _addon.getAddonInfo("name"),
+        _addon.getLocalizedString(30111),  # "No suitable source found"
+        xbmcgui.NOTIFICATION_INFO,
+        3000,
+    )
+    xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+
+
 def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
     results = search_and_score_tmdbh(params, capped=False)
     if results is None:
@@ -1604,6 +1722,10 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
     cache = _details_cache()
     fetcher = file_details.Fetcher([], 0)  # one for the check and the picker after it
     if best_score < min_score:
+        if _no_picker():
+            xbmc.log(f"[KodiSimpleStream] Best score {best_score} below threshold {min_score}, picker disabled", xbmc.LOGINFO)
+            _no_source_found()
+            return
         xbmc.log(f"[KodiSimpleStream] Best score {best_score} below threshold {min_score}, showing source picker", xbmc.LOGINFO)
         # The picker shows the same sources, no second search
         select_tmdbh_source(params, results, cache, fetcher)
@@ -1631,6 +1753,9 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
             rate = f" bitrate={source_ui.bitrate_text(candidate.get('bitrate'), candidate.get('bitrate_estimated'))}"
         xbmc.log(f"[KodiSimpleStream] Autoplay skips ({rejection}) score={candidate['score']}{rate} name={candidate['name']}", xbmc.LOGINFO)
 
+    if _no_picker():
+        _no_source_found()
+        return
     xbmcgui.Dialog().notification(
         _addon.getAddonInfo("name"),
         _addon.getLocalizedString(30074),  # "The best sources do not fit, choose one"
@@ -1691,6 +1816,7 @@ def tmdbh_play(params: Dict[str, Any]) -> None:
     # The second player (docs/tmdbhelper/kodisimplestream_select.json) always opens the source picker,
     # only the exact value turns it on
     force_picker = params.pop("select", None) == "1"
+    no_picker = _no_picker()  # the picker is never shown: select=1 is ignored, auto-play always
     queries = build_tmdbh_queries(params)
     if not queries:
         xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "Missing required metadata for TMDb Helper search", xbmcgui.NOTIFICATION_ERROR, 4000)
@@ -1703,10 +1829,10 @@ def tmdbh_play(params: Dict[str, Any]) -> None:
         return
 
     _add_english_title(params)
-    if force_picker:
+    if force_picker and not no_picker:
         xbmc.log("[KodiSimpleStream] TMDbH source picker requested, auto-play skipped", xbmc.LOGINFO)
         select_tmdbh_source(params)
-    elif _addon.getSettingBool("tmdbh_auto_play_best"):
+    elif no_picker or _addon.getSettingBool("tmdbh_auto_play_best"):
         play_best_tmdbh_source(params)
     else:
         select_tmdbh_source(params)
@@ -1758,6 +1884,25 @@ def _int_param(params: Dict[str, str], name: str) -> Optional[int]:
     except (KeyError, ValueError):
         return None
 
+# Actions that stay available in kids mode (kids_only): playback from TMDb Helper and the kids search
+_KIDS_ACTIONS = ("tmdbh_play", "kids_search")
+_PLAYBACK_ACTIONS = ("play", "play_ident")
+
+def _refuse_kids_mode(action: str) -> None:
+    """Kids mode: notifies and ends the call the way the action expects (resolve failure or a failed directory)."""
+    xbmcgui.Dialog().notification(
+        _addon.getAddonInfo("name"),
+        _addon.getLocalizedString(30110),  # "Not available in kids mode"
+        xbmcgui.NOTIFICATION_INFO,
+        3000,
+    )
+    if _handle < 0:
+        return
+    if action in _PLAYBACK_ACTIONS:
+        xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+    else:
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
+
 def router(paramstring: str) -> None:
     """Dispatches actions based on plugin paramstring."""
     global _refresh_pass
@@ -1766,6 +1911,10 @@ def router(paramstring: str) -> None:
 
     if action is None:
         list_categories()
+        return
+
+    if _flag("kids_only") and action not in _KIDS_ACTIONS:
+        _refuse_kids_mode(action)
         return
 
     if action in _LISTING_ACTIONS:
@@ -1798,6 +1947,8 @@ def router(paramstring: str) -> None:
         search_tmdb(30015, "series")
     elif action == "tmdb_setup":
         tmdb_setup()
+    elif action == "kids_search":
+        kids_search(params.get("type", "both"), params.get("query", ""), params.get("replace") == "1")
     elif action == "select_tmdb":
         handle_tmdb_selection(params["tmdb_id"], params["search_type"])
     elif action == "list_episodes":
