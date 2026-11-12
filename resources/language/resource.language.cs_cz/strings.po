@@ -297,8 +297,8 @@ msgid "Kids search"
 msgstr "Dětské hledání"
 
 msgctxt "#30091"
-msgid "Kids mode: the add-on offers only the kids search"
-msgstr "Dětský režim: doplněk nabízí jen dětské hledání"
+msgid "Kids mode: the search filters by age and the add-on offers only the search (off: the search finds everything)"
+msgstr "Dětský režim: hledání filtruje podle věku a doplněk nabízí jen hledání (vypnuto: hledání najde vše)"
 
 msgctxt "#30092"
 msgid "Age of the child (titles with a higher age rating are hidden)"
@@ -327,8 +327,8 @@ msgid "Kids search"
 msgstr "Dětské hledání"
 
 msgctxt "#30108"
-msgid "Kids search: title"
-msgstr "Dětské hledání: název"
+msgid "Search: title"
+msgstr "Hledat: název"
 
 msgctxt "#30109"
 msgid "No suitable titles found"
@@ -389,3 +389,11 @@ msgstr "Hledat seriály"
 msgctxt "#30140"
 msgid "Relevance (TMDb order)"
 msgstr "Relevance (pořadí z TMDb)"
+
+msgctxt "#30141"
+msgid "Search movies and series"
+msgstr "Hledat filmy a seriály"
+
+msgctxt "#30142"
+msgid "Trakt (watchlist, watched...)"
+msgstr "Trakt (seznam, zhlédnuto…)"

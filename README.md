@@ -111,10 +111,12 @@ Když se cokoli nepovede, zůstane statický náhled. Vypíná se v nastavení *
 - Volitelně [TMDb Helper](#tmdb-helper-integrace): otestováno s verzí **5.4.16** z oficiálního repozitáře Kodi. Řada 6.x z repozitáře autora TMDb Helperu zatím vyzkoušená není.
 
 ### Dětské hledání
-Hledání filmů a seriálů v TMDb, které pustí jen tituly vhodné pro dítě daného věku. Celé běží uvnitř doplňku,
-TMDb Helper se nijak neupravuje. Potřebuje TMDb API klíč. V hlavním menu jsou položky **Hledat vše**, **Hledat filmy** a **Hledat seriály**; hledá filmy
+Hledání filmů a seriálů v TMDb. Se zapnutým **Dětským režimem** (`kids_only`) pustí jen tituly vhodné pro dítě daného věku,
+bez něj najde všechno (kromě titulů pro dospělé podle TMDb). Celé běží uvnitř doplňku,
+TMDb Helper se nijak neupravuje. Potřebuje TMDb API klíč. V hlavním menu doplňku je jedna položka **Hledat filmy a seriály** (v dětském režimu rovnou tři: **Hledat vše**, **Hledat filmy**, **Hledat seriály**); hledá filmy
 i seriály (`?action=kids_search`, volitelně `type=movie|tv|both` a `query=...`, bez dotazu se zeptá klávesnicí).
-Nad výsledky je položka **Nové hledání**, která nahradí aktuální seznam.
+Nad výsledky je položka **Nové hledání**, která nahradí aktuální seznam. V kontextovém menu každého výsledku je **Trakt (seznam, zhlédnuto…)**:
+otevře nabídku Traktu z TMDb Helperu (watchlist, sbírka, zhlédnuto).
 
 Nastavení (sekce **Dětské hledání**):
 - **Věk dítěte** (`kids_age`, výchozí 8, povolené 3 až 18) – tituly s vyšším věkovým hodnocením se nezobrazí.
@@ -130,7 +132,7 @@ Nastavení (sekce **Dětské hledání**):
 - **Minimum hlasů** (`kids_min_votes`, výchozí 20) – titul s méně hlasy na TMDb se skryje, 0 = bez omezení.
 - **Tituly bez věkového hodnocení** (`kids_unrated`: zakázat / povolit, výchozí zakázat) – co se stane s titulem,
   u kterého TMDb nezná žádné použitelné hodnocení.
-- **Kids mode** (`kids_only`, vypnuto) – doplněk nabídne jen dětské hledání a odmítne všechno ostatní kromě
+- **Kids mode** (`kids_only`, vypnuto) – hledání filtruje podle věku a doplněk nabídne jen dětské hledání a odmítne všechno ostatní kromě
   přehrání z TMDb Helperu (hledání na Webshare i v TMDb, výběr titulu, epizody, náhledy, detaily souborů, přímé
   přehrání). V tomto režimu se nikdy neukáže ani výběr zdroje.
 - **Nikdy nezobrazovat výběr zdroje** (`tmdbh_no_picker`, vypnuto; sekce TMDb Helper) – ať přehrávač pro TMDb Helper

@@ -282,6 +282,9 @@ def _to_entry(kind, item, verdict, details=None) -> Dict:
     }
 
 
+_UNFILTERED = Verdict(True, "unfiltered")  # no age: the entry shows no certification
+
+
 def _sort_key(cfg: KidsConfig, item, rank=(0, 0)):
     """Sort key (ascending) of a search item for cfg.sort: TMDb relevance (rank = page, position), popularity,
     rating or release date, newest first."""
@@ -299,6 +302,16 @@ def _sort_key(cfg: KidsConfig, item, rank=(0, 0)):
 def search_safe(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, workers=6) -> List[Dict]:
     """Searches TMDb and keeps only titles that pass evaluate(); any failing details call drops the title.
     limit and pages default to cfg.limit and a number of pages that can fill it."""
+    return _search(tmdb, query, kinds, cfg, limit, pages, workers, filtered=True)
+
+
+def search_all(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, workers=6) -> List[Dict]:
+    """The same search without the age filter (kids mode off): everything TMDb finds, except adult titles.
+    Only cfg.sort and cfg.limit apply."""
+    return _search(tmdb, query, kinds, cfg, limit, pages, workers, filtered=False)
+
+
+def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered) -> List[Dict]:
     if limit is None:
         limit = cfg.limit
     if pages is None:
@@ -317,7 +330,7 @@ def search_safe(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, wor
                 if key in seen or item.get("id") is None:
                     continue
                 seen.add(key)
-                if prefilter(item, cfg) is None:
+                if not filtered or prefilter(item, cfg) is None:
                     candidates.append((kind, item, (page, position)))
             except Exception:
                 continue  # a malformed item drops only itself
@@ -326,6 +339,8 @@ def search_safe(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, wor
 
     def check(candidate):
         kind, item, _rank = candidate
+        if not filtered:
+            return _UNFILTERED
         try:
             verdict = evaluate(kind, tmdb.details_with_ratings(kind, item["id"]), cfg)
         except Exception:

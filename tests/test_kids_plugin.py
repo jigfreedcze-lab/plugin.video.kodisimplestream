@@ -38,6 +38,7 @@ class ListItem:
     def setInfo(self, kind, info): self.info = info
     def setArt(self, art): self.art = art
     def setProperty(self, k, v): self.props[k] = v
+    def addContextMenuItems(self, items): self.context = list(items)
 
 answers = []  # answers of the wizard dialogs, in the order they are asked
 asked = []
@@ -71,13 +72,23 @@ FOUND = [
      "rating": 8.0, "certification": "", "country": ""},
 ]
 calls = []
+used = []  # which search ran: "safe" (kids mode on) or "all" (off)
 def fake_search(tmdb, query, kinds, cfg, **kw):
     calls.append((query, list(kinds), cfg))
+    used.append(fake_search.name)
     if isinstance(fake_search.result, Exception):
         raise fake_search.result
     return fake_search.result
 fake_search.result = FOUND
+fake_search.name = "safe"
 k.kids.search_safe = fake_search
+def fake_all(tmdb, query, kinds, cfg, **kw):
+    fake_search.name = "all"
+    try:
+        return fake_search(tmdb, query, kinds, cfg, **kw)
+    finally:
+        fake_search.name = "safe"
+k.kids.search_all = fake_all
 tmdb_client = object()
 k.get_tmdb = lambda: tmdb_client
 keyboard = []
@@ -94,6 +105,8 @@ assert url1 == TMDBH + "?info=play&tmdb_type=movie&tmdb_id=123" and folder1 is F
 assert item1.label == "Malý princ (2015)  [8+]", item1.label
 assert item1.art["poster"] == "http://img/p1.jpg" and item1.art["fanart"] == "http://img/p1.jpg", item1.art
 assert item1.info["plot"] == "Příběh." and item1.info["rating"] == 7.4, item1.info
+assert item1.context == [("#30142", "RunScript(plugin.video.themoviedb.helper,sync_trakt,tmdb_type=movie,tmdb_id=123)")], item1.context
+assert item2.context == [("#30142", "RunScript(plugin.video.themoviedb.helper,sync_trakt,tmdb_type=tv,tmdb_id=77)")], item2.context
 assert url2 == TMDBH + "?info=seasons&tmdb_type=tv&tmdb_id=77" and folder2 is True and "IsPlayable" not in item2.props, items
 assert item2.label == "Méďové (2010)", item2.label  # no certification known: no brackets
 
@@ -135,6 +148,14 @@ assert items[0][0] == "plugin://plugin.video.kodisimplestream/?action=kids_searc
 # a cancelled keyboard from the results leaves the shown list as it is
 log.clear(); items.clear(); updates.clear(); keyboard[:] = [None]
 k.router("action=kids_search&replace=1"); assert not items and log[-1] == ("end", False) and updates == [False], (items, log, updates)
+# kids mode off: everything (search_all); on: the age filter (search_safe)
+Addon.settings.pop("kids_only", None); used.clear(); k.router("action=kids_search&query=a")
+assert used == ["all"], used
+Addon.settings["kids_only"] = "true"; used.clear(); k.router("action=kids_search&query=a")
+assert used == ["safe"], used
+Addon.settings["kids_only"] = "false"; used.clear(); k.router("action=kids_search&type=tv&query=a")
+assert used == ["all"], used
+Addon.settings.pop("kids_only", None)
 print("kids_search: listing checks passed")
 
 # --- config wiring ---
@@ -297,6 +318,6 @@ assert not actions, "the wizard button is gone"
 for gone in (30093, 30094, 30095, 30096, 30097, 30100, 30103, 30106, 30112, 30113, 30114, 30115, 30116, 30117, 30118,
              30120, 30121, 30122, 30123, 30124, 30125, 30127, 30128, 30129):
     assert gone not in cs and gone not in en, gone
-assert {30090, 30091, 30092, 30099, 30104, 30105, 30107, 30108, 30109, 30110, 30111, 30126, 30130, 30131, 30132, 30133, 30134, 30135, 30136, 30137, 30138, 30139, 30140} <= cs & en
+assert {30090, 30091, 30092, 30099, 30104, 30105, 30107, 30108, 30109, 30110, 30111, 30126, 30130, 30131, 30132, 30133, 30134, 30135, 30136, 30137, 30138, 30139, 30140, 30142} <= cs & en
 assert "kids_configure" not in spec_source and "kids_cache" not in spec_source
 print("kids plugin: all checks passed")

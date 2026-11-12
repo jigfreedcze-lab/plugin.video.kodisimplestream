@@ -297,8 +297,8 @@ msgid "Kids search"
 msgstr "Kids search"
 
 msgctxt "#30091"
-msgid "Kids mode: the add-on offers only the kids search"
-msgstr "Kids mode: the add-on offers only the kids search"
+msgid "Kids mode: the search filters by age and the add-on offers only the search (off: the search finds everything)"
+msgstr "Kids mode: the search filters by age and the add-on offers only the search (off: the search finds everything)"
 
 msgctxt "#30092"
 msgid "Age of the child (titles with a higher age rating are hidden)"
@@ -327,8 +327,8 @@ msgid "Kids search"
 msgstr "Kids search"
 
 msgctxt "#30108"
-msgid "Kids search: title"
-msgstr "Kids search: title"
+msgid "Search: title"
+msgstr "Search: title"
 
 msgctxt "#30109"
 msgid "No suitable titles found"
@@ -389,3 +389,11 @@ msgstr "Search series"
 msgctxt "#30140"
 msgid "Relevance (TMDb order)"
 msgstr "Relevance (TMDb order)"
+
+msgctxt "#30141"
+msgid "Search movies and series"
+msgstr "Search movies and series"
+
+msgctxt "#30142"
+msgid "Trakt (watchlist, watched...)"
+msgstr "Trakt (watchlist, watched…)"

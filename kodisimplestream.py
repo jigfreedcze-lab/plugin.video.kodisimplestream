@@ -730,7 +730,7 @@ def list_categories() -> None:
         item.setArt({"icon": icon})
         xbmcplugin.addDirectoryItem(_handle, get_url(action=action), item, isFolder=is_folder)
     # One entry in the normal menu; the choice everything / movies / series is one level down
-    item = xbmcgui.ListItem(label=_addon.getLocalizedString(30107))  # "Kids search"
+    item = xbmcgui.ListItem(label=_addon.getLocalizedString(30141))  # "Search movies and series"
     item.setArt({"icon": "DefaultAddonsSearch.png"})
     xbmcplugin.addDirectoryItem(_handle, get_url(action="kids_menu"), item, isFolder=True)
 
@@ -1163,6 +1163,11 @@ def list_kids_results(results: List[Dict[str, Any]], kind: str = "both", replace
         path, is_folder = kids_item_path(result)
         if not is_folder:
             item.setProperty("IsPlayable", "true")
+        # Context menu: the Trakt options of TMDb Helper (watchlist, collection, watched, ...) for this title
+        tmdb_id = str(result["id"]).partition(":")[2] or str(result["id"])
+        tmdb_type = "movie" if result["kind"] == "movie" else "tv"
+        item.addContextMenuItems([(_addon.getLocalizedString(30142),
+                                   f"RunScript(plugin.video.themoviedb.helper,sync_trakt,tmdb_type={tmdb_type},tmdb_id={tmdb_id})")])
         xbmcplugin.addDirectoryItem(_handle, path, item, isFolder=is_folder)
     if replace:
         # A search started from the results takes their place in the history
@@ -1186,7 +1191,9 @@ def kids_search(kind: str = "both", query: str = "", replace: bool = False) -> N
             return
     cfg = _kids_config()
     try:
-        results = kids.search_safe(tmdb, query, kinds, cfg)
+        # Kids mode on: only titles the age allows; off: everything TMDb finds
+        search = kids.search_safe if _flag("kids_only") else kids.search_all
+        results = search(tmdb, query, kinds, cfg)
     except Exception as exc:
         show_tmdb_error(exc)
         return
