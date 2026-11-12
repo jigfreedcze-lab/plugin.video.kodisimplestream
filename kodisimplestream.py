@@ -729,8 +729,16 @@ def list_categories() -> None:
         item = xbmcgui.ListItem(label=_addon.getLocalizedString(label_id))
         item.setArt({"icon": icon})
         xbmcplugin.addDirectoryItem(_handle, get_url(action=action), item, isFolder=is_folder)
-    _add_kids_search_items()
+    # One entry in the normal menu; the choice everything / movies / series is one level down
+    item = xbmcgui.ListItem(label=_addon.getLocalizedString(30107))  # "Kids search"
+    item.setArt({"icon": "DefaultAddonsSearch.png"})
+    xbmcplugin.addDirectoryItem(_handle, get_url(action="kids_menu"), item, isFolder=True)
 
+    xbmcplugin.endOfDirectory(_handle)
+
+def kids_menu() -> None:
+    """The kids search choice: everything, movies only, series only."""
+    _add_kids_search_items()
     xbmcplugin.endOfDirectory(_handle)
 
 def tmdb_setup() -> None:
@@ -1947,6 +1955,8 @@ def router(paramstring: str) -> None:
         search_tmdb(30015, "series")
     elif action == "tmdb_setup":
         tmdb_setup()
+    elif action == "kids_menu":
+        kids_menu()
     elif action == "kids_search":
         kids_search(params.get("type", "both"), params.get("query", ""), params.get("replace") == "1")
     elif action == "select_tmdb":

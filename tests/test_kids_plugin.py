@@ -199,7 +199,10 @@ Addon.settings["kids_only"] = "false"
 k.search_webshare = lambda: allowed.append(("search_webshare",))
 log.clear(); k.router("action=search_webshare"); assert allowed[-1] == ("search_webshare",) and not log
 items.clear(); k.router("")
-assert [i[0].split("action=")[1] for i in items] == ["search_webshare", "search_tmdb_movie", "search_tmdb_series", "kids_search", "kids_search&type=movie", "kids_search&type=tv"], items
+assert [i[0].split("action=")[1] for i in items] == ["search_webshare", "search_tmdb_movie", "search_tmdb_series", "kids_menu"], items
+# the submenu: everything / movies / series
+items.clear(); k.router("action=kids_menu")
+assert [i[0].split("action=")[1] for i in items] == ["kids_search", "kids_search&type=movie", "kids_search&type=tv"], items
 print("kids_only: checks passed")
 
 # --- tmdbh_no_picker ---
