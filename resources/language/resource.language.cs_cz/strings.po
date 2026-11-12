@@ -322,10 +322,6 @@ msgctxt "#30105"
 msgid "Allow"
 msgstr "Povolit"
 
-msgctxt "#30107"
-msgid "Kids search"
-msgstr "Dětské hledání"
-
 msgctxt "#30108"
 msgid "Search: title"
 msgstr "Hledat: název"

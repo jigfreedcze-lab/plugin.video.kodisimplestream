@@ -70,7 +70,7 @@ Addon.settings["tmdb_api_key"] = "0123456789abcdef0123456789abcdef"
 log.clear(); k.list_categories(); assert menu_actions() == [("search_webshare", True), ("search_tmdb_movie", True), ("search_tmdb_series", True), ("kids_menu", True)] and log[-1] == ("end", True), log
 for empty in ("", "   "):
     Addon.settings["tmdb_api_key"] = empty
-    log.clear(); k.list_categories(); assert menu_actions() == [("search_webshare", True), ("tmdb_setup", False), ("kids_menu", True)] and log[-1] == ("end", True), log
+    log.clear(); k.list_categories(); assert menu_actions() == [("search_webshare", True), ("tmdb_setup", False)] and log[-1] == ("end", True), log
 # akční položka: Kodi ji spustí jako skript s handle -1, bez listingu a bez endOfDirectory
 k._handle = -1
 log.clear(); answers[:] = [True]; k.router("action=tmdb_setup")

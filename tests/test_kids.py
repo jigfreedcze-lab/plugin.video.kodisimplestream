@@ -6,8 +6,15 @@ import types
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-sys.modules.setdefault("requests", types.ModuleType("requests"))  # tmdb.py imports it; no HTTP here
-from resources.lib import kids
+_had_requests = "requests" in sys.modules
+if not _had_requests:
+    sys.modules["requests"] = types.ModuleType("requests")  # tmdb.py imports it; no HTTP here
+try:
+    from resources.lib import kids
+    from resources.lib import tmdb as _tmdb  # noqa: F401  (imported while the fake exists)
+finally:
+    if not _had_requests:
+        del sys.modules["requests"]  # do not leak an empty fake into other test modules
 from resources.lib.kids import (AGE_TABLE, KidsConfig, blocked_genres_for_age, config_from_settings, evaluate,
                                 is_no_rating, normalise, prefilter, ratings_of, search_safe)
 
@@ -189,12 +196,22 @@ class TableTests(unittest.TestCase):
         with open(path, encoding="utf-8") as f:  # a missing file fails the test on purpose
             snapshot = json.load(f)
         self.assertIn("CA-QC", snapshot["movie"])
+        uncovered = set()
         for kind, countries in snapshot.items():
             for country, certs in countries.items():
                 if country in AGE_TABLE:
                     for cert in certs:
                         self.assertTrue(normalise(cert) in AGE_TABLE[country] or is_no_rating(country, cert),
                                         (kind, country, cert))
+                else:
+                    uncovered.add(country)
+        # Countries of the snapshot that the table does not know are a conscious decision: a new country in
+        # TMDb's lists fails here until it is added to AGE_TABLE or to this list (their adult ratings are
+        # still caught by foreign_min_age).
+        deliberately_outside = {"AR", "BE", "BG", "CL", "GR", "HK", "ID", "IL", "IN", "JP", "KR", "LT", "LU", "LV",
+                                "MA", "MO", "MX", "MY", "PH", "PR", "PT", "RO", "RU", "SG", "TH", "TR", "TW", "UA",
+                                "VI", "ZA"}
+        self.assertEqual(uncovered - deliberately_outside, set(), "countries of the snapshot missing in AGE_TABLE")
 
 
 class RatingsOfTests(unittest.TestCase):
@@ -263,12 +280,18 @@ class EvaluateTests(unittest.TestCase):
         self.assertEqual(verdict.age, 13)
 
     FAMILY = {"CZ": ["U"], "DE": ["0"], "SE": ["Btl"], "US": ["G"], "GB": ["U"], "FR": ["U"], "ES": ["TP"],
-              "NL": ["AL"], "AT": ["0"], "IT": ["T"], "CH": ["12"], "HU": ["16"]}
+              "NL": ["AL"], "AT": ["0"], "IT": ["T"], "CH": ["12"], "HU": ["12"]}
 
     def test_outlier_countries_ignored_with_many_countries(self):
-        verdict = self.ev(movie(self.FAMILY), age=8)  # default percentile 75: CH 12 and HU 16 do not decide
+        verdict = self.ev(movie(self.FAMILY), age=8)  # default percentile 75: CH 12 and HU 12 do not decide
         self.assertTrue(verdict.allowed, verdict)
         self.assertEqual(verdict.age, 0)
+        # ...but a 16+ rating is never an outlier: it decides whatever the other countries say
+        self.assertFalse(self.ev(movie(dict(self.FAMILY, HU=["16"])), age=8).allowed)
+        five = {"US": ["R"], "CZ": ["U"], "FR": ["TP"], "ES": ["A"], "IT": ["T"]}
+        verdict = self.ev(movie(five), age=8)
+        self.assertEqual((verdict.allowed, verdict.age, verdict.label), (False, 17, "US R"))
+        self.assertFalse(self.ev(movie(dict(five, US=["NC-17"])), age=16).allowed)
         # an adult title stays high: most countries agree
         adult = {"CZ": ["18"], "DE": ["16"], "US": ["R"], "GB": ["18"], "SE": ["15"], "FR": ["16"]}
         self.assertFalse(self.ev(movie(adult), age=8).allowed)
@@ -276,7 +299,7 @@ class EvaluateTests(unittest.TestCase):
 
     def test_percentile_setting(self):
         self.assertFalse(self.ev(movie(self.FAMILY), age=8, percentile=100).allowed)  # the strictest decides
-        self.assertEqual(self.ev(movie(self.FAMILY), age=18, percentile=100).age, 16)
+        self.assertEqual(self.ev(movie(self.FAMILY), age=18, percentile=100).age, 12)
         self.assertEqual(self.ev(movie(self.FAMILY), age=18, percentile=50).age, 0)
 
     def test_one_vote_per_country(self):
@@ -309,14 +332,35 @@ class EvaluateTests(unittest.TestCase):
         self.assertEqual((verdict.allowed, verdict.reason), (False, "unrated"))
         self.assertTrue(self.ev(movie({"US": ["NR"]}), age=8, unrated="allow").allowed)
 
-    def test_countries_outside_table_ignored(self):
-        self.assertTrue(self.ev(movie({"JP": ["R-18"], "CZ": ["U"]}), age=3).allowed)
-        verdict = self.ev(movie({"JP": ["R-18"]}), age=8)
+    def test_countries_outside_table(self):
+        # an unreadable or young rating outside the table is ignored next to a placed one
+        self.assertTrue(self.ev(movie({"JP": ["G"], "CZ": ["U"]}), age=3).allowed)
+        self.assertTrue(self.ev(movie({"JP": ["PG12"], "CZ": ["U"]}), age=3).allowed)
+        verdict = self.ev(movie({"JP": ["G"]}), age=8)
         self.assertEqual(verdict.reason, "unplaced rating")
+
+    def test_adult_rating_outside_table_rejects(self):
+        for country, cert in (("JP", "R18+"), ("JP", "R-18"), ("KR", "19"), ("RU", "18+"), ("TH", "X"),
+                              ("KR", "18"), ("MX", "+16"), ("XX", "NC-17")):
+            verdict = self.ev(movie({country: [cert], "CZ": ["U"]}), age=8)
+            self.assertEqual((verdict.allowed, verdict.reason), (False, "age too high"), (country, cert))
+            self.assertEqual(verdict.label, f"{country} {cert}")
+        self.assertFalse(self.ev(tv({"KR": "19", "CZ": "U"}), "tv", age=8).allowed)
+        # an older child may still see it
+        self.assertTrue(self.ev(movie({"KR": ["16"], "CZ": ["U"]}), age=16).allowed)
+        self.assertFalse(self.ev(movie({"KR": ["19"], "CZ": ["U"]}), age=18).allowed)
+        # JP R18+ + KR 19 + RU 18+ + CZ U (the reviewed bypass)
+        self.assertFalse(self.ev(movie({"JP": ["R18+"], "KR": ["19"], "RU": ["18+"], "CZ": ["U"]}), age=8).allowed)
+
+    def test_foreign_min_age(self):
+        from resources.lib.kids import foreign_min_age
+        for text, expected in (("R18+", 18), ("19", 19), ("18+", 18), ("X", 18), ("16", 16), ("+18", 18),
+                               ("12", None), ("PG12", None), ("G", None), ("", None), ("2018", None), ("R", None)):
+            self.assertEqual(foreign_min_age(text), expected, text)
 
     def test_only_foreign_rating_never_counts_as_unrated(self):
         for unrated in ("deny", "allow"):
-            verdict = self.ev(movie({"KR": ["19"]}), age=18, unrated=unrated)
+            verdict = self.ev(movie({"KR": ["ABC"]}), age=18, unrated=unrated)
             self.assertEqual((verdict.allowed, verdict.reason), (False, "unplaced rating"), unrated)
         self.assertFalse(self.ev(movie({"CA-QC": ["18+"]}), age=8, unrated="allow").allowed)
         self.assertTrue(self.ev(movie({"JP": ["NR"]}), unrated="allow").allowed)  # a no-rating marker is still none
@@ -500,10 +544,80 @@ class SearchSafeTests(unittest.TestCase):
         self.assertNotIn("movie:1", [r["id"] for r in result])
 
 
-class RemovedApiTests(unittest.TestCase):
-    def test_gone(self):
-        for name in ("CertCache", "load_cert_meta", "certification_rank", "parse_languages"):
-            self.assertFalse(hasattr(kids, name), name)
+class SearchRobustnessTests(unittest.TestCase):
+    def setUp(self):
+        self.searches = {("movie", 1): [sr(1, 10), sr(2, "high", vote_average="9x"), sr(3, None, vote_average="n/a"),
+                                        sr(4, float("nan"), release_date=20200101, overview=5)]}
+        self.details = {("movie", i): movie({"CZ": ["U"]}) for i in range(1, 5)}
+
+    def test_non_numeric_fields_do_not_break_search(self):
+        for sort in ("relevance", "popularity", "rating", "year"):
+            tmdb = FakeTmdb(self.searches, self.details)
+            result = search_safe(tmdb, "q", ("movie",), KidsConfig(age=12, sort=sort))
+            self.assertEqual(sorted(r["id"] for r in result), ["movie:1", "movie:2", "movie:3", "movie:4"], sort)
+        self.assertEqual([r["id"] for r in search_safe(tmdb, "q", ("movie",), KidsConfig(age=12, sort="popularity"))][0],
+                         "movie:1")
+
+    def test_details_failure_is_logged_without_details_of_the_error(self):
+        logged = []
+        original = kids._log
+        kids._log = logged.append
+        try:
+            class Secret(FakeTmdb):
+                def details_with_ratings(self, kind, tmdb_id):
+                    if tmdb_id == 2:
+                        raise RuntimeError("https://x/3/movie/2?api_key=SECRETKEY")
+                    return super().details_with_ratings(kind, tmdb_id)
+            result = search_safe(Secret(self.searches, self.details), "q", ("movie",), KidsConfig(age=12))
+        finally:
+            kids._log = original
+        self.assertNotIn("movie:2", [r["id"] for r in result])
+        self.assertEqual(len(logged), 1)
+        self.assertIn("movie:2", logged[0])
+        self.assertNotIn("SECRETKEY", logged[0])
+
+    def test_all_details_failing_raises_instead_of_empty(self):
+        tmdb = FakeTmdb(self.searches, self.details, failing=[("movie", i) for i in range(1, 5)])
+        original = kids._log
+        kids._log = lambda message: None
+        try:
+            with self.assertRaises(RuntimeError):
+                search_safe(tmdb, "q", ("movie",), KidsConfig(age=12))
+        finally:
+            kids._log = original
+        # nothing suitable (as opposed to a failure) is still an empty list
+        self.assertEqual(search_safe(FakeTmdb(self.searches, self.details), "q", ("movie",), KidsConfig(age=12, min_votes=10 ** 6)), [])
+
+
+class SearchAllTests(unittest.TestCase):
+    def setUp(self):
+        self.searches = {("movie", 1): [sr(1, 10, vote_average=5), sr(2, 50, vote_average=9, adult=True),
+                                        sr(3, 30, vote_average=8, genre_ids=[27], vote_count=0, release_date="2023-01-01"),
+                                        sr(4, 20, vote_average=6, release_date="2010-01-01")],
+                         ("tv", 1): [sr(10, 40, name="Serial", first_air_date="2021-01-01", release_date=None)]}
+
+    def run_all(self, cfg, **kw):
+        tmdb = FakeTmdb(self.searches, {})  # details_with_ratings would raise KeyError: it must not be called
+        return tmdb, kids.search_all(tmdb, "q", ("movie", "tv"), cfg, **kw)
+
+    def ids(self, cfg, **kw):
+        return [r["id"] for r in self.run_all(cfg, **kw)[1]]
+
+    def test_no_age_filter_but_no_adult(self):
+        tmdb, result = self.run_all(KidsConfig(age=3, sort="popularity"))
+        self.assertEqual([r["id"] for r in result], ["tv:10", "movie:3", "movie:4", "movie:1"])  # horror, 0 votes kept; adult gone
+        self.assertEqual(tmdb.detail_threads, set())
+        self.assertTrue(all(r["certification"] == "" for r in result))
+
+    def test_sorting(self):
+        self.assertEqual(self.ids(KidsConfig(sort="rating")), ["movie:3", "tv:10", "movie:4", "movie:1"])
+        self.assertEqual(self.ids(KidsConfig(sort="year")), ["movie:3", "tv:10", "movie:1", "movie:4"])
+        self.assertEqual(self.ids(KidsConfig(sort="relevance")), ["tv:10", "movie:1", "movie:3", "movie:4"])
+
+    def test_limit(self):
+        self.assertEqual(self.ids(KidsConfig(sort="popularity"), limit=2), ["tv:10", "movie:3"])
+        self.assertEqual(self.ids(KidsConfig(sort="popularity", limit=1)), ["tv:10"])
+
 
 class RealDataAliasesTest(unittest.TestCase):
     def test_strings_seen_in_real_tmdb_data_are_placed(self):
@@ -527,6 +641,15 @@ class PosterTests(unittest.TestCase):
         del details["images"]["posters"][2:]
         self.assertEqual(_best_poster(item, details), "/en.jpg")
         self.assertEqual(_best_poster(item, {}), "/jp.jpg")
+        # Slovak before English, language-less last
+        sk = {"images": {"posters": [{"iso_639_1": None, "file_path": "/none.jpg", "vote_average": 9},
+                                     {"iso_639_1": "sk", "file_path": "/sk.jpg", "vote_average": 1},
+                                     {"iso_639_1": "en", "file_path": "/en.jpg", "vote_average": 8}]}}
+        self.assertEqual(_best_poster(item, sk), "/sk.jpg")
+        del sk["images"]["posters"][1:]
+        self.assertEqual(_best_poster(item, sk), "/none.jpg")
+        self.assertEqual(_best_poster(item, {"images": {"posters": [{"iso_639_1": "ja", "file_path": "/ja.jpg"}]}}), "/jp.jpg")
+        self.assertEqual(_best_poster(item, {"images": {"posters": [{"iso_639_1": "cs", "file_path": "/a.jpg", "vote_average": "x"}]}}), "/a.jpg")
         self.assertEqual(_best_poster(item, {"images": None}), "/jp.jpg")
 
 class DisplayTitleTests(unittest.TestCase):

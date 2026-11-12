@@ -175,5 +175,7 @@ class TMDB:
         """Posters and translations of a title (heavy, so only for titles that are listed)."""
         if kind not in ("movie", "tv"):
             raise ValueError(f"Invalid TMDb kind: {kind}")
-        # images in Czech, then English, then language-less ones (otherwise TMDb shows the original, e.g. Japanese, poster)
-        return self._get(f"{kind}/{tmdb_id}", append_to_response="images,translations", include_image_language="cs,en,null")
+        # posters in Czech, Slovak, English, then language-less ones; kids._best_poster picks in that order
+        # (without the filter TMDb would show the original, e.g. Japanese, poster)
+        return self._get(f"{kind}/{tmdb_id}", append_to_response="images,translations",
+                         include_image_language="cs,sk,en,null")

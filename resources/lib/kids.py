@@ -1,8 +1,11 @@
 """Kid-safe search on top of TMDb data. Pure logic, no Kodi imports.
 
 The only setting is the age of the child. Every certification TMDb knows for a country of the built-in table is
-mapped to a minimum age; the strictest rating over all those countries decides.
+mapped to a minimum age. The strictest rating decides; only when it is below 16 and enough countries rate the title,
+a percentile (setting) may discard stray strict outliers. A rating of 16+ is never discarded, and a rating of a
+country outside the table that clearly reads as 16+ (18+, R18+, 19, X ...) rejects the title too.
 """
+import math
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -74,6 +77,25 @@ def config_from_settings(get_setting: Callable[[str], str]) -> KidsConfig:
     return KidsConfig(age=age, unrated=unrated, min_votes=min_votes, percentile=percentile, sort=sort, limit=limit)
 
 
+def _log(message):
+    """Logs to the Kodi log when available, else to stdlib logging. Callers must not pass secrets (API key, URLs)."""
+    try:
+        import xbmc  # lazy: kids.py itself needs no Kodi
+        xbmc.log(f"[KodiSimpleStream] {message}", getattr(xbmc, "LOGWARNING", 2))
+    except ImportError:
+        import logging
+        logging.getLogger(__name__).warning(message)
+
+
+def _number(value, default=0.0) -> float:
+    """value as a finite float, else default (TMDb data must never break a search)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
+
 # --- age table: certification -> minimum age, per country (movie and TV scales are merged: one table per country) ---
 
 AGE_TABLE: Dict[str, Dict[str, int]] = {
@@ -117,6 +139,20 @@ def normalise(text) -> str:
     text = text.replace("＋", "+")
     text = re.sub(r"\s*\+", "+", text)
     return re.sub(r"\s+", " ", text)
+
+
+_ADULT_WORDS = frozenset({"X", "XXX", "AO", "NC-17", "NC17"})
+
+
+def foreign_min_age(certification) -> Optional[int]:
+    """Minimum age of a rating of a country outside the table when it reads unambiguously as 16 or more
+    ("R18+", "19", "18+", "R-18", "X", "+16"); None for anything else (unreadable or younger, which is ignored)."""
+    value = normalise(certification)
+    if value in _ADULT_WORDS:
+        return 18
+    ages = [int(n) for n in re.findall(r"(?<!\d)(\d{1,2})(?!\d)", value)]
+    ages = [a for a in ages if 16 <= a <= 21]
+    return max(ages) if ages else None
 
 
 def is_no_rating(country, certification) -> bool:
@@ -207,25 +243,34 @@ def evaluate(kind, details, cfg: KidsConfig) -> Verdict:
 
     placed = {}  # country -> (age, label): the strictest rating we could place for that country
     foreign = None  # a real rating from a country outside the table
+    foreign_adult = None  # (age, label): the strictest outside-table rating that clearly reads as 16+
     for country, cert in ratings_of(kind, details):
         if is_no_rating(country, cert):
             continue
         table = AGE_TABLE.get(country)
         if table is None:
             foreign = foreign or f"{country} {cert}"  # cannot be placed, so it must not count as "unrated"
+            read_age = foreign_min_age(cert)
+            if read_age is not None and (foreign_adult is None or read_age > foreign_adult[0]):
+                foreign_adult = (read_age, f"{country} {cert}")
             continue
         age = table.get(normalise(cert))
         if age is None:
             return Verdict(False, "unplaced rating", label=f"{country} {cert}")  # never guess: fail closed
         if country not in placed or age > placed[country][0]:
             placed[country] = (age, f"{country} {cert}")  # one vote per country: its strictest rating
+    if foreign_adult and foreign_adult[0] > cfg.age:
+        return Verdict(False, "age too high", foreign_adult[0], foreign_adult[1])  # never ignored, never guessed
     if not placed:
         strictest = None
     else:
-        # A percentile of the per-country ages, so a stray outlier country (a CH 12, a data error) does not
-        # decide alone; with few countries the strictest wins (stay cautious).
-        percentile = cfg.percentile if len(placed) >= MIN_COUNTRIES_FOR_PERCENTILE else 100
-        strictest = _percentile_pick(list(placed.values()), percentile)
+        entries = list(placed.values())
+        # A percentile of the per-country ages, so a stray strict outlier (a CH 12, a data error) does not decide
+        # alone. It must never fail open: when the strictest rating is 16+ it always decides (US R, 18+ ...),
+        # and with few countries the strictest wins as well (too little data to call anything an outlier).
+        strictest = max(entries, key=lambda e: e[0])
+        if strictest[0] < 16 and len(placed) >= MIN_COUNTRIES_FOR_PERCENTILE:
+            strictest = _percentile_pick(entries, cfg.percentile)
     if strictest is None:
         if foreign:
             return Verdict(False, "unplaced rating", label=foreign)  # rated only where we cannot read it: fail closed
@@ -238,13 +283,14 @@ def evaluate(kind, details, cfg: KidsConfig) -> Verdict:
 
 
 def _best_poster(item, details) -> Optional[str]:
-    """Poster path: the best Czech one, else Slovak/English, else the search result's own (never raises)."""
+    """Poster path: the best Czech one, else Slovak/English, else a language-less one, else the search result's
+    own (never raises)."""
     try:
         posters = [p for p in (details.get("images") or {}).get("posters") or [] if p.get("file_path")]
-        for lang in ("cs", "sk", "en"):
+        for lang in ("cs", "sk", "en", None):
             found = [p for p in posters if p.get("iso_639_1") == lang]
             if found:
-                return max(found, key=lambda p: p.get("vote_average") or 0)["file_path"]
+                return max(found, key=lambda p: _number(p.get("vote_average")))["file_path"]
     except Exception:
         pass
     return item.get("poster_path")
@@ -266,15 +312,16 @@ def _display_title(item, details) -> str:
 
 
 def _to_entry(kind, item, verdict, details=None) -> Dict:
-    date = item.get("release_date") or item.get("first_air_date") or ""
+    date = str(item.get("release_date") or item.get("first_air_date") or "")
     poster = _best_poster(item, details or {})
-    rating = item.get("vote_average")
+    poster = poster if isinstance(poster, str) else None
+    rating = _number(item.get("vote_average"))
     return {
         "id": f"{kind}:{item['id']}",
         "kind": kind,
         "title": _display_title(item, details),
         "year": date[:4] or None,
-        "plot": item.get("overview") or None,
+        "plot": str(item.get("overview") or "") or None,
         "poster": IMAGE_URL + poster if poster else None,
         "rating": round(rating, 1) if rating else None,
         "certification": f"{verdict.age}+" if verdict.age is not None else "",
@@ -288,13 +335,13 @@ _UNFILTERED = Verdict(True, "unfiltered")  # no age: the entry shows no certific
 def _sort_key(cfg: KidsConfig, item, rank=(0, 0)):
     """Sort key (ascending) of a search item for cfg.sort: TMDb relevance (rank = page, position), popularity,
     rating or release date, newest first."""
-    popularity = item.get("popularity") or 0
+    popularity = _number(item.get("popularity"))
     if cfg.sort == "relevance":
         return (rank, -popularity)
     if cfg.sort == "rating":
-        return (-(item.get("vote_average") or 0), -popularity)
+        return (-_number(item.get("vote_average")), -popularity)
     if cfg.sort == "year":
-        date = item.get("release_date") or item.get("first_air_date") or ""
+        date = str(item.get("release_date") or item.get("first_air_date") or "")
         return (tuple(-ord(ch) for ch in date) or (0,), -popularity)  # a missing date sorts last
     return (-popularity,)
 
@@ -330,12 +377,18 @@ def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered
                 if key in seen or item.get("id") is None:
                     continue
                 seen.add(key)
-                if not filtered or prefilter(item, cfg) is None:
+                if not filtered:
+                    if item.get("adult"):
+                        continue  # kids mode off still never lists adult titles
+                    candidates.append((kind, item, (page, position)))
+                elif prefilter(item, cfg) is None:
                     candidates.append((kind, item, (page, position)))
             except Exception:
                 continue  # a malformed item drops only itself
     if not candidates:
         return []
+
+    errors = []  # exceptions of the details calls (list.append is thread safe)
 
     def check(candidate):
         kind, item, _rank = candidate
@@ -343,12 +396,17 @@ def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered
             return _UNFILTERED
         try:
             verdict = evaluate(kind, tmdb.details_with_ratings(kind, item["id"]), cfg)
-        except Exception:
+        except Exception as exc:
+            errors.append(exc)
+            # type only, no str(exc): the message of an HTTP error may carry the request URL with the key
+            _log(f"kids: details of {kind}:{item.get('id')} failed, title dropped: {type(exc).__name__}")
             return None  # fail closed
         return verdict if verdict.allowed else None
 
     with ThreadPoolExecutor(max_workers=max(1, min(workers, len(candidates)))) as pool:
         verdicts = list(pool.map(check, candidates))
+    if errors and len(errors) == len(candidates):
+        raise errors[0]  # every details call failed: a network/auth problem, not "nothing suitable"
     ranked = sorted(((_sort_key(cfg, candidates[i][1], candidates[i][2]), i) for i, v in enumerate(verdicts) if v),
                     key=lambda t: t)
     chosen = [i for _, i in ranked][:max(limit, 0)]
@@ -361,7 +419,11 @@ def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered
             extras = tmdb.details_extras(kind, item["id"])
         except Exception:
             extras = None
-        return _to_entry(kind, item, verdicts[i], extras)
+        try:
+            return _to_entry(kind, item, verdicts[i], extras)
+        except Exception as exc:  # a malformed item drops only itself
+            _log(f"kids: {kind}:{item.get('id')} could not be built: {type(exc).__name__}")
+            return None
 
     with ThreadPoolExecutor(max_workers=max(1, min(workers, len(chosen)))) as pool:
-        return list(pool.map(build, chosen))
+        return [entry for entry in pool.map(build, chosen) if entry]

@@ -729,10 +729,11 @@ def list_categories() -> None:
         item = xbmcgui.ListItem(label=_addon.getLocalizedString(label_id))
         item.setArt({"icon": icon})
         xbmcplugin.addDirectoryItem(_handle, get_url(action=action), item, isFolder=is_folder)
-    # One entry in the normal menu; the choice everything / movies / series is one level down
-    item = xbmcgui.ListItem(label=_addon.getLocalizedString(30141))  # "Search movies and series"
-    item.setArt({"icon": "DefaultAddonsSearch.png"})
-    xbmcplugin.addDirectoryItem(_handle, get_url(action="kids_menu"), item, isFolder=True)
+    if _addon.getSetting("tmdb_api_key").strip():  # without a key the setup item above is the only way on
+        # One entry in the normal menu; the choice everything / movies / series is one level down
+        item = xbmcgui.ListItem(label=_addon.getLocalizedString(30141))  # "Search movies and series"
+        item.setArt({"icon": "DefaultAddonsSearch.png"})
+        xbmcplugin.addDirectoryItem(_handle, get_url(action="kids_menu"), item, isFolder=True)
 
     xbmcplugin.endOfDirectory(_handle)
 
@@ -1186,9 +1187,16 @@ def kids_search(kind: str = "both", query: str = "", replace: bool = False) -> N
     query = (query or "").strip()
     if not query:
         query = (_keyboard_search(30108) or "").strip()
-        if not query:
+        if query:
+            # Show the results on a URL that carries the query: a Container.Refresh (the Trakt context
+            # menu of TMDb Helper) then reloads the same results instead of asking again
+            url = get_url(action="kids_search", **({"type": kind} if kind in ("movie", "tv") else {}),
+                          query=query, **({"replace": 1} if replace else {}))
+            xbmc.executebuiltin(f"Container.Update({url})")
+        # Cancelled or handed over: this empty call is closed, the shown list stays as it is
+        if _handle >= 0:
             xbmcplugin.endOfDirectory(_handle, succeeded=False)
-            return
+        return
     cfg = _kids_config()
     try:
         # Kids mode on: only titles the age allows; off: everything TMDb finds
@@ -1900,7 +1908,7 @@ def _int_param(params: Dict[str, str], name: str) -> Optional[int]:
         return None
 
 # Actions that stay available in kids mode (kids_only): playback from TMDb Helper and the kids search
-_KIDS_ACTIONS = ("tmdbh_play", "kids_search")
+_KIDS_ACTIONS = ("tmdbh_play", "kids_search", "kids_menu")
 _PLAYBACK_ACTIONS = ("play", "play_ident")
 
 def _refuse_kids_mode(action: str) -> None:

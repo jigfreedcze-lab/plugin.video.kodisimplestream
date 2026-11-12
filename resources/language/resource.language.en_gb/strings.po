@@ -322,10 +322,6 @@ msgctxt "#30105"
 msgid "Allow"
 msgstr "Allow"
 
-msgctxt "#30107"
-msgid "Kids search"
-msgstr "Kids search"
-
 msgctxt "#30108"
 msgid "Search: title"
 msgstr "Search: title"

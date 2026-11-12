@@ -94,10 +94,18 @@ k.get_tmdb = lambda: tmdb_client
 keyboard = []
 k._keyboard_search = lambda label_id: (log.append(("keyboard", label_id)), keyboard.pop(0))[1]
 
-log.clear(); items.clear(); keyboard[:] = ["princ"]
+# the keyboard hands the search over to a URL with the query (a Container.Refresh must not ask again)
+n = len(calls); log.clear(); items.clear(); keyboard[:] = ["princ"]
 k.router("action=kids_search")
-assert log == [("keyboard", 30108), ("end", True)], log
-assert calls[-1][:2] == ("princ", ["movie", "tv"]), calls[-1]
+assert log == [("keyboard", 30108), ("builtin", "Container.Update(plugin://plugin.video.kodisimplestream/?action=kids_search&query=princ)"),
+               ("end", False)] and len(calls) == n and not items, log
+log.clear(); keyboard[:] = ["bluey"]
+k.router("action=kids_search&type=tv&replace=1")
+assert log[1] == ("builtin", "Container.Update(plugin://plugin.video.kodisimplestream/?action=kids_search&type=tv&query=bluey&replace=1)"), log
+# the refresh of that URL (Trakt context menu) lists the same results without the keyboard
+log.clear(); items.clear(); keyboard[:] = []
+k.router("action=kids_search&query=princ")
+assert log == [("end", True)] and calls[-1][:2] == ("princ", ["movie", "tv"]), (log, calls[-1])
 (urln, itemn, foldern), (url1, item1, folder1), (url2, item2, folder2) = items
 assert urln == "plugin://plugin.video.kodisimplestream/?action=kids_search&replace=1" and foldern is True and itemn.label == "#30126", items
 assert updates[-1] is False, updates
@@ -141,8 +149,8 @@ fake_search.result = FOUND
 n = len(calls); k.get_tmdb = lambda: None; log.clear(); k.router("action=kids_search&query=a"); assert len(calls) == n and log == [("end", False)], log
 k.get_tmdb = lambda: tmdb_client
 # New search from the results: the type is kept, the listing replaces the old one in the history
-log.clear(); items.clear(); updates.clear(); keyboard[:] = ["bluey"]
-k.router("action=kids_search&type=tv&replace=1")
+log.clear(); items.clear(); updates.clear(); keyboard[:] = []
+k.router("action=kids_search&type=tv&query=bluey&replace=1")
 assert updates == [True] and calls[-1][:2] == ("bluey", ["tv"]), (updates, calls[-1])
 assert items[0][0] == "plugin://plugin.video.kodisimplestream/?action=kids_search&type=tv&replace=1", items[0]
 # a cancelled keyboard from the results leaves the shown list as it is
@@ -214,6 +222,11 @@ k.tmdbh_play = lambda params: allowed.append(("tmdbh_play", params.get("title"))
 log.clear(); items.clear(); keyboard[:] = ["x"]
 k.router("action=tmdbh_play&title=Film"); k.router("action=kids_search&query=a")
 assert allowed == [("tmdbh_play", "Film")] and calls[-1][0] == "a" and ("notif", "#30110") not in log, (allowed, log)
+# the submenu is allowed in kids mode; the Trakt context menu stays (the kids profile has its own Trakt account)
+items.clear(); k.router("action=kids_menu"); assert len(items) == 3 and ("notif", "#30110") not in log, (items, log)
+items.clear(); k.router("action=kids_search&query=a")
+assert items and any(getattr(i[1], "context", None) and i[1].context[0][0] == "#30142" for i in items), "kids mode: Trakt context menu"
+
 
 # off: the Webshare search works and the root menu is the normal one with the kids entry
 Addon.settings["kids_only"] = "false"
@@ -221,6 +234,10 @@ k.search_webshare = lambda: allowed.append(("search_webshare",))
 log.clear(); k.router("action=search_webshare"); assert allowed[-1] == ("search_webshare",) and not log
 items.clear(); k.router("")
 assert [i[0].split("action=")[1] for i in items] == ["search_webshare", "search_tmdb_movie", "search_tmdb_series", "kids_menu"], items
+# without a TMDb key: the setup item instead of the kids search entry
+_key = Addon.settings.pop("tmdb_api_key"); items.clear(); k.router("")
+assert [i[0].split("action=")[1] for i in items] == ["search_webshare", "tmdb_setup"], items
+Addon.settings["tmdb_api_key"] = _key
 # the submenu: everything / movies / series
 items.clear(); k.router("action=kids_menu")
 assert [i[0].split("action=")[1] for i in items] == ["kids_search", "kids_search&type=movie", "kids_search&type=tv"], items
@@ -318,6 +335,6 @@ assert not actions, "the wizard button is gone"
 for gone in (30093, 30094, 30095, 30096, 30097, 30100, 30103, 30106, 30112, 30113, 30114, 30115, 30116, 30117, 30118,
              30120, 30121, 30122, 30123, 30124, 30125, 30127, 30128, 30129):
     assert gone not in cs and gone not in en, gone
-assert {30090, 30091, 30092, 30099, 30104, 30105, 30107, 30108, 30109, 30110, 30111, 30126, 30130, 30131, 30132, 30133, 30134, 30135, 30136, 30137, 30138, 30139, 30140, 30142} <= cs & en
+assert {30090, 30091, 30092, 30099, 30104, 30105, 30108, 30109, 30110, 30111, 30126, 30130, 30131, 30132, 30133, 30134, 30135, 30136, 30137, 30138, 30139, 30140, 30142} <= cs & en
 assert "kids_configure" not in spec_source and "kids_cache" not in spec_source
 print("kids plugin: all checks passed")

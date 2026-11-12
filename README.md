@@ -113,37 +113,41 @@ Když se cokoli nepovede, zůstane statický náhled. Vypíná se v nastavení *
 ### Dětské hledání
 Hledání filmů a seriálů v TMDb. Se zapnutým **Dětským režimem** (`kids_only`) pustí jen tituly vhodné pro dítě daného věku,
 bez něj najde všechno (kromě titulů pro dospělé podle TMDb). Celé běží uvnitř doplňku,
-TMDb Helper se nijak neupravuje. Potřebuje TMDb API klíč. V hlavním menu doplňku je jedna položka **Hledat filmy a seriály** (v dětském režimu rovnou tři: **Hledat vše**, **Hledat filmy**, **Hledat seriály**); hledá filmy
-i seriály (`?action=kids_search`, volitelně `type=movie|tv|both` a `query=...`, bez dotazu se zeptá klávesnicí).
-Nad výsledky je položka **Nové hledání**, která nahradí aktuální seznam. V kontextovém menu každého výsledku je **Trakt (seznam, zhlédnuto…)**:
-otevře nabídku Traktu z TMDb Helperu (watchlist, sbírka, zhlédnuto).
+TMDb Helper se nijak neupravuje. Potřebuje TMDb API klíč. V hlavním menu doplňku je jedna položka **Hledat filmy a seriály**, která vede na podnabídku (`?action=kids_menu`) se třemi položkami:
+**Hledat vše**, **Hledat filmy**, **Hledat seriály** (v dětském režimu jsou tyto tři položky přímo v hlavním menu).
+Samotné hledání (`?action=kids_search`, volitelně `type=movie|tv|both` a `query=...`, bez dotazu se zeptá klávesnicí)
+hledá filmy i seriály.
+Nad výsledky je položka **Nové hledání**, která nahradí aktuální seznam. Mimo dětský režim je v kontextovém menu každého
+výsledku **Trakt (seznam, zhlédnuto…)**, která otevře nabídku Traktu z TMDb Helperu (watchlist, sbírka, zhlédnuto).
+V dětském režimu tato položka v kontextovém menu **není**.
 
 Nastavení (sekce **Dětské hledání**):
 - **Věk dítěte** (`kids_age`, výchozí 8, povolené 3 až 18) – tituly s vyšším věkovým hodnocením se nezobrazí.
   Všechno ostatní se odvodí z tohoto čísla.
 - **Přísnost** (`kids_percentile`, výchozí 75, povolené 50 až 100) – hodnocení se nejdřív sloučí po zemích (za každou
-  zemi platí její nejpřísnější) a vybere se uvedený percentil těchto věků: 100 = rozhoduje nejpřísnější země, 50 =
-  medián. Má-li titul méně než 5 zemí, platí vždy nejpřísnější. **Je to vědomé rozhodnutí:** při výchozích 75 se
-  nejpřísnější čtvrtina zemí ignoruje, aby jedna odlehlá země (např. CH 12, chyba v datech) nevyřadila běžnou pohádku.
-  Důsledek je, že titul, který jedna země hodnotí výrazně přísněji (třeba USA R), může projít, když ho většina zemí
-  pouští dětem. Kdo to nechce, nastaví 100 (rozhoduje nejpřísnější země).
+  zemi platí její nejpřísnější) a z věků zemí se vybere percentil: 100 = rozhoduje nejpřísnější země, 50 =
+  medián. Nižší přísnost toleruje jednu odlehlou zemi (chybu v datech), vyšší ji bere vážně. Přesná pravidla (kdy se
+  který percentil použije a jak se zachází s nepřehlédnutelně přísnými hodnoceními) se mohou v dalších verzích
+  zpřísnit, proto je zde nepopisujeme. Kdo chce nejopatrnější chování, nastaví 100.
 - **Řazení výsledků** (`kids_sort`: relevance (pořadí z TMDb) / popularita / hodnocení / rok vydání, výchozí relevance) a **Nejvíce výsledků**
-  (`kids_limit`, výchozí 20, povolené 5 až 60) – týká se jen dětského hledání, ne řazení souborů na Webshare (`ws_sort`).
+  (`kids_limit`, výchozí 20, povolené 5 až 60) – týká se jen hledání filmů a seriálů v TMDb, ne řazení souborů na Webshare (`ws_sort`).
+  Platí v dětském režimu i bez něj.
 - **Minimum hlasů** (`kids_min_votes`, výchozí 20) – titul s méně hlasy na TMDb se skryje, 0 = bez omezení.
+  Jen v dětském režimu.
 - **Tituly bez věkového hodnocení** (`kids_unrated`: zakázat / povolit, výchozí zakázat) – co se stane s titulem,
   u kterého TMDb nezná žádné použitelné hodnocení.
-- **Kids mode** (`kids_only`, vypnuto) – hledání filtruje podle věku a doplněk nabídne jen dětské hledání a odmítne všechno ostatní kromě
+- **Dětský režim** (`kids_only`, vypnuto) – hledání filtruje podle věku a doplněk nabídne jen dětské hledání a odmítne všechno ostatní kromě
   přehrání z TMDb Helperu (hledání na Webshare i v TMDb, výběr titulu, epizody, náhledy, detaily souborů, přímé
-  přehrání). V tomto režimu se nikdy neukáže ani výběr zdroje.
-- **Nikdy nezobrazovat výběr zdroje** (`tmdbh_no_picker`, vypnuto; sekce TMDb Helper) – ať přehrávač pro TMDb Helper
-  výběr zdroje neotevře nikdy: ignoruje i druhý přehrávač „výběr zdroje“, auto-play se použije vždy a když žádný zdroj
-  nevyhovuje, zobrazí upozornění a přehrání skončí. Hodí se pro děti, které by si neuměly vybrat.
+  přehrání). V tomto režimu se nikdy neukáže ani výběr zdroje (jako se zapnutým `tmdbh_no_picker`).
+  Při **vypnutém** dětském režimu se věk dítěte, přísnost, minimum hlasů, žánry ani nehodnocené tituly nepoužijí
+  (hledání najde všechno, kromě titulů pro dospělé podle TMDb); platí jen **Řazení výsledků** (`kids_sort`) a
+  **Nejvíce výsledků** (`kids_limit`).
 
 Jak se věk titulu odvodí:
 - Doplněk má vestavěnou tabulku „hodnocení -> minimální věk“ pro CZ, SK, DE, AT, CH, US, GB, FR, ES, IT, NL, SE, NO,
   DK, FI, CA (včetně CA-QC) a BR, ještě AU, NZ, IE, PL a HU (jedna tabulka na zemi, platí pro filmy i seriály). Bere se hodnocení **ze všech těchto zemí** (z TMDb: datumy vydání filmu, hodnocení seriálu). Za každou zemi platí její
-  nejpřísnější hodnocení a z věků zemí se vybere percentil podle nastavení **Přísnost** (výchozí 75). Titul projde, jen
-  když vybraný věk není vyšší než věk dítěte. Má-li titul méně než 5 zemí, platí nejpřísnější. Hodnocení zemí mimo tabulku se při výpočtu věku ignoruje, ale titul, který má hodnocení jen v takových
+  nejpřísnější hodnocení a z věků zemí se vybere věk podle nastavení **Přísnost** (viz výše). Titul projde, jen
+  když vybraný věk není vyšší než věk dítěte. Hodnocení zemí mimo tabulku se při výpočtu věku neberou v úvahu, ale titul, který má hodnocení jen v takových
   zemích, se nepovažuje za nehodnocený a vyřadí se (i při povolení nehodnocených titulů).
 - Značky „bez hodnocení“ (NR, UR, Unrated, prázdné hodnocení) věk nenesou a ignorují se. Pokud nezbude žádné
   hodnocení, rozhoduje **Tituly bez věkového hodnocení**.
@@ -163,7 +167,7 @@ Další pravidla (první, které titul vyřadí, rozhoduje):
 1. Titul pro dospělé se vyřadí.
 2. Zakázané žánry podle věku: do 11 let horor, thriller, krimi, válečný, mysteriózní a „válka a politika“;
    od 12 do 15 let horor a válečný; od 16 let žádné. Povolené žánry ani jazyk se nevyžadují.
-3. Titul s méně než 20 hlasy na TMDb se vyřadí.
+3. Titul s méně hlasy na TMDb, než je **Minimum hlasů** (`kids_min_votes`, výchozí 20), se vyřadí.
 
 Výsledek se vypíše jako `Název (rok)  [6+]` (věk, který titulu vyšel, jen když je znám). Film se po výběru přehraje
 přes `plugin://plugin.video.themoviedb.helper/?info=play&tmdb_type=movie&tmdb_id=<id>`, seriál otevře řady přes
@@ -214,7 +218,20 @@ zvolte **Select player** (TMDb Helper nemá český překlad, položka je anglic
 *Combine all players for plugin into single entry*) nejdřív zvolte položku tohoto doplňku, **kodisimplestream** (název z `addon.xml`), a pak tento přehrávač. Otevře se stejný výběr zdroje
 jako při vypnutém auto-play (včetně minimálního skóre a změny hledání).
 
+Up Next (automatické nabídnutí dalšího dílu):
+- Hlavní přehrávač `kodisimplestream.json` má `"make_playlist": "upnext"`, takže TMDb Helper po spuštění epizody
+  připraví další díly pro doplněk **Up Next** (`service.upnext`), který musí být nainstalovaný. Funguje jen hlavní
+  přehrávač, ne `kodisimplestream_select.json`.
+- Při vypnutém auto-play (výchozí) se další díl otevře ve výběru zdroje. Když nikdo nic nevybere, nic se nepřehraje.
+- Stávající uživatelé musí po aktualizaci **znovu zkopírovat** `kodisimplestream.json` do
+  `userdata/addon_data/plugin.video.themoviedb.helper/players/`, jinak se Up Next nezapne.
+- Chování řetězu více dílů za sebou bylo ověřeno jen čtením kódu, ne v praxi. V okrajových případech (třeba výběr
+  zdroje trvá déle než 30 s) se nabídka Up Next nemusí objevit.
+
 Nová nastavení addonu (sekce **TMDb Helper**):
+- **Nikdy nezobrazovat výběr zdroje** (`tmdbh_no_picker`, vypnuto) – ať přehrávač výběr zdroje neotevře nikdy: ignoruje i
+  druhý přehrávač „výběr zdroje“, auto-play se použije vždy a když žádný zdroj nevyhovuje, zobrazí upozornění a
+  přehrání skončí. Hodí se pro děti, které by si neuměly vybrat. V dětském režimu platí vždy.
 - **Auto-play best source** – automaticky přehraje nejlépe skórovaný zdroj.
 - **Auto-play minimum score** – minimální skóre, od kterého dojde k auto-play.
 - **Auto-play maximum bitrate** – nejvyšší průměrný datový tok v Mbit/s, který auto-play ještě spustí (výchozí 30,
