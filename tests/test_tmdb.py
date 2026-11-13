@@ -140,7 +140,8 @@ class Resp429(Resp):
         self.headers = {} if retry_after is None else {"Retry-After": retry_after}
 sleeps, attempts, logged = [], [], []
 real_time, real_log = tmdb_mod.time, tmdb_mod._log
-tmdb_mod.time = types.SimpleNamespace(sleep=sleeps.append)
+import time as _real_time
+tmdb_mod.time = types.SimpleNamespace(sleep=sleeps.append, monotonic=_real_time.monotonic)
 tmdb_mod._log = logged.append
 def answers(*responses):
     queue = list(responses)
@@ -184,3 +185,8 @@ except tmdb_mod.TMDBError as ex: assert KEY not in str(ex) and "404" in str(ex),
 tmdb_mod.time, tmdb_mod._log = real_time, real_log
 handler = fake_get
 print("5. kolo: session, timeouty, 429 a ochrana klíče OK")
+
+# 6th round: request statistics for the timing log (counts and seconds only)
+tmdb_mod.stats_reset()
+_snap = tmdb_mod.stats_snapshot()
+assert _snap["requests"] == 0 and _snap["net"] == 0.0 and _snap["peak"] == 0 and _snap["active"] == 0, _snap

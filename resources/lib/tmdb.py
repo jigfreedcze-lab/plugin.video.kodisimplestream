@@ -37,6 +37,22 @@ def _log(message: str) -> None:
 _session = None
 _session_lock = threading.Lock()
 
+# Request statistics of this process for the timing log: counts and seconds only, never URLs or keys
+_stats_lock = threading.Lock()
+_stats = {"requests": 0, "net": 0.0, "slowest": 0.0, "active": 0, "peak": 0, "session": 0.0}
+
+
+def stats_reset() -> None:
+    """Starts a new measurement (the session setup time stays: it is paid once per process)."""
+    with _stats_lock:
+        _stats.update(requests=0, net=0.0, slowest=0.0, active=0, peak=0)
+
+
+def stats_snapshot() -> dict:
+    """requests, net (sum of the seconds of all requests), slowest, peak (most requests at once), session (setup)."""
+    with _stats_lock:
+        return dict(_stats)
+
 
 def shared_session():
     """
@@ -47,6 +63,7 @@ def shared_session():
     global _session
     with _session_lock:
         if _session is None:
+            setup_started = time.monotonic()
             session = requests.Session()
             # No cookies needed; an unchanged jar lets the threads share the session (requests iterates it unlocked)
             session.cookies.set_policy(http.cookiejar.DefaultCookiePolicy(allowed_domains=[]))
@@ -58,6 +75,8 @@ def shared_session():
             except Exception:
                 pass  # only a speed-up
             _session = session
+            with _stats_lock:
+                _stats["session"] = time.monotonic() - setup_started
         return _session
 
 
@@ -113,11 +132,22 @@ class TMDB:
         timeout = self._timeout if _timeout is None else _timeout
         session = shared_session()
         for attempt in (1, 2):
+            request_started = time.monotonic()
+            with _stats_lock:
+                _stats["active"] += 1
+                _stats["peak"] = max(_stats["peak"], _stats["active"])
             try:
                 response = session.get(self.BASE_URL + path, params=params, headers=headers, timeout=timeout)
             except Exception as exc:
                 # No chaining: the traceback of the original error carries the URL with the key
                 raise TMDBError(f"TMDb request {path} failed ({type(exc).__name__}: {self._redact(str(exc))[:200]})") from None
+            finally:
+                elapsed = time.monotonic() - request_started
+                with _stats_lock:
+                    _stats["active"] -= 1
+                    _stats["requests"] += 1
+                    _stats["net"] += elapsed
+                    _stats["slowest"] = max(_stats["slowest"], elapsed)
             if response.status_code == 429 and attempt == 1:
                 delay = self._retry_delay(response)
                 _log(f"TMDb rate limit (429) on {path.split('/')[0]}, retrying once in {delay:.1f} s")

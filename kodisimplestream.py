@@ -27,6 +27,7 @@ import xbmcplugin
 from resources.lib import file_details, kids, kids_memo, preview, source_ui
 from resources.lib.webshare import WebshareAPI, WebshareError, WebshareStatusError
 from resources.lib.tmdb import TMDB, TMDBAuthError, PLAYBACK_TIMEOUT
+from resources.lib.tmdb import stats_reset as tmdb_stats_reset, stats_snapshot as tmdb_stats_snapshot
 from resources.lib.source_ui import (
     compact_label,
     language_tag,
@@ -1277,6 +1278,7 @@ def kids_search(kind: str = "both", query: str = "", replace: bool = False) -> N
         return
     cfg = _kids_config()
     started = time.monotonic()
+    tmdb_stats_reset()
     kids_mode = _flag("kids_only")
     cache = _kids_memo() if kids_mode else None  # kids mode off: nothing is read or remembered
     cached = cache.get_search_report(query, kinds, cfg) if cache else None
@@ -1306,8 +1308,11 @@ def kids_search(kind: str = "both", query: str = "", replace: bool = False) -> N
             message = (_addon.getLocalizedString(30155).format(kids.hidden_total(shown)) if shown  # "... (hidden: N)"
                        else _addon.getLocalizedString(30109))  # "No suitable titles found"
             xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), message, xbmcgui.NOTIFICATION_INFO, 3000)
+    stats = tmdb_stats_snapshot()
+    detail = (f", {stats['requests']} requests, {stats['net']:.1f}s in requests, slowest {stats['slowest']:.2f}s, "
+              f"at most {stats['peak']} at once, session setup {stats['session']:.2f}s" if stats["requests"] else "")
     xbmc.log(f"[KodiSimpleStream] kids_search timing: {time.monotonic() - started:.2f}s (cache {state}, "
-             f"hidden {kids.hidden_total(hidden)})", xbmc.LOGINFO)
+             f"hidden {kids.hidden_total(hidden)}{detail})", xbmc.LOGINFO)
     list_kids_results(results, kind, replace, hidden)
 
 

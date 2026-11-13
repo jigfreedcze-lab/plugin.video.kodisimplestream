@@ -157,8 +157,9 @@ Jak se věk titulu odvodí:
 - Doplněk má vestavěnou tabulku „hodnocení -> minimální věk“ pro CZ, SK, DE, AT, CH, US, GB, FR, ES, IT, NL, SE, NO,
   DK, FI, CA (včetně CA-QC) a BR, ještě AU, NZ, IE, PL a HU (jedna tabulka na zemi, platí pro filmy i seriály). Bere se hodnocení **ze všech těchto zemí** (z TMDb: datumy vydání filmu, hodnocení seriálu). Za každou zemi platí její
   nejpřísnější hodnocení a z věků zemí se vybere věk podle nastavení **Přísnost** (viz výše). Titul projde, jen
-  když vybraný věk není vyšší než věk dítěte. Hodnocení zemí mimo tabulku se při výpočtu věku neberou v úvahu, ale titul, který má hodnocení jen v takových
-  zemích, se nepovažuje za nehodnocený a vyřadí se (i při povolení nehodnocených titulů).
+  když vybraný věk není vyšší než věk dítěte. Hodnocení zemí mimo tabulku samo o sobě titul nezamítne (jedna odlehlá země nerozhoduje); zamítne ho až shoda
+  aspoň dvou takových zemí na 16+ nad věkem dítěte. Titul, který má hodnocení jen v takových zemích, se nepovažuje za
+  nehodnocený a vyřadí se (i při povolení nehodnocených titulů).
 - Značky „bez hodnocení“ (NR, UR, Unrated, prázdné hodnocení) věk nenesou a ignorují se. Pokud nezbude žádné
   hodnocení, rozhoduje **Tituly bez věkového hodnocení**.
 - Chybějící nebo porušený údaj o žánrech (nebo o počtu hlasů) titul vyřadí.
@@ -187,7 +188,7 @@ pak dělá přehrávač KodiSimpleStream z [TMDb Helper integrace](#tmdb-helper-
 Omezení:
 - TMDb nemá věkové hodnocení u všech titulů (zvlášť u starších a českých). Takový titul se ve výchozím nastavení
   nezobrazí; po povolení **Tituly bez věkového hodnocení** projdou i nehodnocené tituly, třeba pro dospělé.
-- Údaje na TMDb (žánry, hodnocení) nejsou dokonalé a špatné hodnocení z jedné země titul zablokuje. Filtr je
+- Údaje na TMDb (žánry, hodnocení) nejsou dokonalé a špatné hodnocení z jedné země z tabulky (16+) titul zablokuje. Filtr je
   pomůcka, ne záruka. Spolehlivý seznam jsou oblíbené položky (Favourites), které si rodič vybere sám.
 - **Kontrola při přehrání:** v dětském režimu se věk titulu ověří i těsně před přehráním přes TMDb Helper
   (`tmdbh_play`), takže zakázaný titul vybraný jinde (hledání nebo widget v TMDb Helperu) se nepřehraje a ukáže se
@@ -207,7 +208,7 @@ Omezení:
   tapetě (skinu) nastavuje Kodi a skin, tento doplněk je nenahrazuje.
 - **Co má rodič zamknout v Kodi** (doplněk to sám zajistit nemůže):
   - **Nastavení:** nastavení doplňku (včetně vypnutí dětského režimu a věku) jde změnit jen přes Nastavení Kodi. V
-    *Nastavení → Profily → Hlavní zámek* nastavte kód a u dětského profilu zamkněte *Nastavení a správce souborů*.
+    *Nastavení → Rozhraní → Hlavní zámek* nastavte kód a určete, co se zamyká (např. *Nastavení a správce souborů*).
   - **Ovládání zvenčí:** JSON-RPC, webové rozhraní, Kore, UPnP a AirPlay (*Nastavení → Služby → Ovládání*) umí přehrát
     libovolnou adresu a kontrola věku se pak neuplatní u podstrčeného názvu. Vypněte je nebo je dejte pod heslo.
   - **TMDb Helper a jiné přehrávače:** kontrola věku platí jen pro přehrávač KodiSimpleStream. Jiný přehrávač v
