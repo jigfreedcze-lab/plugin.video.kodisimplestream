@@ -45,6 +45,7 @@ answers = []  # answers of the wizard dialogs, in the order they are asked
 asked = []
 class Dialog:
     def notification(self, heading, msg, icon=None, ms=None): log.append(("notif", msg))
+    def ok(self, heading, msg): log.append(("ok", msg))
     def select(self, heading, labels, preselect=-1): asked.append(("select", heading, list(labels), preselect)); return answers.pop(0)
     def multiselect(self, heading, labels, preselect=None): asked.append(("multi", heading, list(labels), list(preselect or []))); return answers.pop(0)
     def input(self, heading, default=""): asked.append(("input", heading, default)); return answers.pop(0)
@@ -294,6 +295,7 @@ k._add_english_title = lambda params: None
 k.select_tmdbh_source = lambda params, *a: events.append(("picker",))
 k.play_best_tmdbh_source = lambda params: events.append(("best",))
 k.play_ident = lambda ident: events.append(("play", ident))
+k._request_download_link = lambda ident, verified=False: (events.append(("play", ident)), k.LinkAttempt(url="https://dl/" + ident))[1]  # play_best asks for the link itself
 PARAMS = {"mediatype": "movie", "title": "Film", "year": "2020"}
 
 for no_picker, auto, select, expected in [
@@ -326,10 +328,12 @@ def run_best(results, no_picker, reject=""):
 low = [{"score": 10, "name": "x", "ident": "i1"}]
 # below the threshold: the picker by default, a notification and a failed resolve with no_picker
 ev, lg = run_best(low, "false"); assert ev == [("picker",)] and ("notif", "#30111") not in lg, (ev, lg)
-ev, lg = run_best(low, "true"); assert ev == [] and lg == [("notif", "#30111"), ("resolved", False)], (ev, lg)
+ev, lg = run_best(low, "true"); assert ev == [] and lg == [("ok", "#30145"), ("resolved", False)], (ev, lg)  # a dialog with the scores
+# nothing found at all: a dialog that says so (not an English notification Kodi's own failure dialog would cover)
+ev, lg = run_best([], "false"); assert ev == [] and lg == [("ok", "#30146"), ("resolved", False)], (ev, lg)
 # a candidate above the threshold that is rejected: the same two branches
 ev, lg = run_best(RESULTS, "false", reject="bitrate"); assert ev == [("picker",)] and ("notif", "#30074") in lg, (ev, lg)
-ev, lg = run_best(RESULTS, "true", reject="bitrate"); assert ev == [] and lg == [("notif", "#30111"), ("resolved", False)], (ev, lg)
+ev, lg = run_best(RESULTS, "true", reject="bitrate"); assert ev == [] and lg == [("ok", "#30147"), ("resolved", False)], (ev, lg)  # found but not fitting
 # an acceptable candidate plays either way
 for flag in ("false", "true"):
     ev, lg = run_best(RESULTS, flag); assert ev == [("play", "i1")], (flag, ev)
@@ -340,8 +344,8 @@ for select in (None, "1"):
     events.clear()
     k.tmdbh_play(dict(PARAMS, **({"select": select} if select else {})))
     assert events == [("best",)], (select, events)
-ev, lg = run_best(low, "false"); assert ev == [] and lg == [("notif", "#30111"), ("resolved", False)], (ev, lg)
-ev, lg = run_best(RESULTS, "false", reject="bitrate"); assert ev == [] and lg == [("notif", "#30111"), ("resolved", False)], (ev, lg)
+ev, lg = run_best(low, "false"); assert ev == [] and lg == [("ok", "#30111"), ("resolved", False)], (ev, lg)  # a child gets no numbers
+ev, lg = run_best(RESULTS, "false", reject="bitrate"); assert ev == [] and lg == [("ok", "#30111"), ("resolved", False)], (ev, lg)
 Addon.settings["kids_only"] = "false"
 print("tmdbh_no_picker: checks passed")
 

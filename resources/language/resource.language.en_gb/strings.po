@@ -401,3 +401,19 @@ msgstr "Not suitable for age {}"
 msgctxt "#30144"
 msgid "Not rated, not suitable for age {}"
 msgstr "Not rated, not suitable for age {}"
+
+msgctxt "#30145"
+msgid "No matching file found on Webshare (best match {}%, {}% needed)"
+msgstr "No matching file found on Webshare (best match {}%, {}% needed)"
+
+msgctxt "#30146"
+msgid "Nothing found on Webshare for this title"
+msgstr "Nothing found on Webshare for this title"
+
+msgctxt "#30147"
+msgid "The files found do not fit (another title, length or too high a bitrate)"
+msgstr "The files found do not fit (another title, length or too high a bitrate)"
+
+msgctxt "#30148"
+msgid "The files for this title are not available right now, try again later"
+msgstr "The files for this title are not available right now, try again later"

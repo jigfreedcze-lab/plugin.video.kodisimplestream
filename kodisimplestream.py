@@ -14,7 +14,7 @@ import os
 import ssl
 import sys
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple
 
 import re
 from urllib.parse import parse_qsl, urlencode
@@ -1522,41 +1522,78 @@ def _fetch_autoplay_details(results: List[Dict[str, Any]], params: Dict[str, Any
         _apply_tmdbh_details(results, params, cache)
 
 
-def play_ident(ident: str) -> None:
-    """Asks Webshare for the download link only when the file is played."""
-    video_url = ""
+# What a download link request can end with (LinkAttempt.failure)
+LINK_LOGIN = "login"      # no credentials or a failed login: the user was already told
+LINK_FILE = "file"        # Webshare answered with an error status for the file ("File temporarily unavailable.")
+LINK_NO_LINK = "no_link"  # Webshare answered without an error, but with no link
+LINK_ERROR = "error"      # timeout, connection or another error: not the file's fault
+
+
+class LinkAttempt(NamedTuple):
+    """Result of one try to get the download link of a file."""
+    url: str = ""      # the download link; "" when there is none
+    failure: str = ""  # one of the LINK_* values, "" with a link
+    reason: str = ""   # short text for the notification, "" for the generic one
+    verified: bool = False  # the token was just created (or already proven) in this call: it is not the culprit
+
+
+def _request_download_link(ident: str, token_verified: bool = False) -> LinkAttempt:
+    """Asks Webshare for the download link of one file (logs in first, reusing the cached token).
+    A token cached by an earlier call may have expired: the request is then repeated once after a new login,
+    that is still one attempt. token_verified: the token is known to work (an earlier attempt of this call got
+    an answer for it right after a login), so a failure is the file's and there is no second login.
+    Notifies only about a failed login (login_api); the caller reports the rest."""
     reason = ""  # why there is no link, for the notification
+    video_url = ""
+    failure = LINK_NO_LINK
+    verified = False
     for reuse_token in (True, False):
         api, reused = login_api(reuse_token)
         if not api:
-            xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
-            return
+            return LinkAttempt(failure=LINK_LOGIN)
+        verified = token_verified or not reused
+        failure = LINK_NO_LINK
         try:
             video_url = api.get_download_link(ident)
         except WebshareStatusError as exc:
             xbmc.log(f"[KodiSimpleStream] file_link failed for {ident}: {exc}", xbmc.LOGWARNING)
             # Webshare's own words, e.g. "File temporarily unavailable."
             reason = f"Webshare: {exc.message}" if exc.message else ""
+            failure = LINK_FILE
         except Exception as exc:
             # Connection error or timeout – a new login would not help
             xbmc.log(f"[KodiSimpleStream] file_link failed for {ident}: {exc}", xbmc.LOGWARNING)
             # WebshareError texts are short ("Webshare did not respond in time"), anything else is not shown
-            reason = str(exc) if isinstance(exc, WebshareError) else ""
-            break
-        if video_url or not reused:
+            return LinkAttempt(failure=LINK_ERROR, reason=str(exc) if isinstance(exc, WebshareError) else "")
+        if video_url or verified:
             break
         # The token cached by an earlier call may have expired (error status or an empty link) – log in
         # again, only once (the second pass does not reuse the token)
-    if not video_url:
+    if video_url:
+        return LinkAttempt(url=video_url)
+    return LinkAttempt(failure=failure, reason=reason, verified=verified)
+
+
+def _fail_playback(attempt: LinkAttempt) -> None:
+    """Ends the resolve of a failed link request: a notification with the reason (nothing after a failed
+    login, login_api told the user already)."""
+    if attempt.failure != LINK_LOGIN:
         xbmcgui.Dialog().notification(
             _addon.getAddonInfo("name"),
-            reason or _addon.getLocalizedString(30040),  # "Webshare returned no download link"
+            attempt.reason or _addon.getLocalizedString(30040),  # "Webshare returned no download link"
             xbmcgui.NOTIFICATION_ERROR,
             5000,
         )
-        xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+    xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+
+
+def play_ident(ident: str) -> None:
+    """Asks Webshare for the download link only when the file is played."""
+    attempt = _request_download_link(ident)
+    if not attempt.url:
+        _fail_playback(attempt)
         return
-    play_video(video_url)
+    play_video(attempt.url)
 
 
 def _tmdbh_source(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -1651,7 +1688,7 @@ def select_tmdbh_source(params: Dict[str, Any], results: Optional[List[Dict[str,
             _apply_tmdbh_details(results, params, cache)
             shown, hidden = _picker_sources(results, min_score, expanded)
         if not shown and not hidden:
-            xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
+            _tell_no_source(_addon.getLocalizedString(30146))  # nothing found for the title at all
             new_query = prompt_change_search(current_query)
             if new_query:
                 current_query = new_query
@@ -1713,7 +1750,7 @@ def list_tmdbh_sources(params: Dict[str, Any]) -> None:
         xbmcplugin.endOfDirectory(_handle, succeeded=False)
         return
     if not results:
-        xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
+        _tell_no_source(_addon.getLocalizedString(30146))  # nothing found for the title at all
         xbmcplugin.endOfDirectory(_handle)
         return
 
@@ -1742,15 +1779,30 @@ def _no_picker() -> bool:
     return _flag("tmdbh_no_picker") or _flag("kids_only")
 
 
-def _no_source_found() -> None:
-    """tmdbh_no_picker: the picker is never shown, a source that is not good enough means a failed playback."""
-    xbmcgui.Dialog().notification(
-        _addon.getAddonInfo("name"),
-        _addon.getLocalizedString(30111),  # "No suitable source found"
-        xbmcgui.NOTIFICATION_INFO,
-        3000,
-    )
+def _tell_no_source(text: str) -> None:
+    """A dialog, not a notification: Kodi shows its own "Playback failed" right after a failed resolve and
+    that covers a notification before it can be read."""
+    xbmcgui.Dialog().ok(_addon.getAddonInfo("name"), text)
+
+
+def _no_source_found(best_score: Optional[int] = None, min_score: Optional[int] = None) -> None:
+    """tmdbh_no_picker: the picker is never shown, a source that is not good enough means a failed playback.
+    The dialog says why: nothing similar enough (with the scores) or files that were found but do not fit."""
+    if _flag("kids_only"):
+        text = _addon.getLocalizedString(30111)  # for a child: no numbers, just that nothing suitable was found
+    elif best_score is not None and min_score is not None and best_score < min_score:
+        text = _addon.getLocalizedString(30145).format(best_score, min_score)
+    else:
+        text = _addon.getLocalizedString(30147)
+    _tell_no_source(text)
     xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+
+
+# Auto-play fallback after a file error: at most FALLBACK_ATTEMPTS tries (the first included), and no new try
+# starts when more than FALLBACK_BUDGET seconds have passed since the first one began (a single try keeps
+# the webshare.TIMEOUT, so a slow first source does not queue up several more)
+FALLBACK_ATTEMPTS = 3
+FALLBACK_BUDGET = 8.0
 
 
 def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
@@ -1759,7 +1811,7 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
     if not results:
-        xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), "No matching sources found", xbmcgui.NOTIFICATION_INFO, 4000)
+        _tell_no_source(_addon.getLocalizedString(30146))  # nothing found for the title at all
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
 
@@ -1772,7 +1824,7 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
     if best_score < min_score:
         if _no_picker():
             xbmc.log(f"[KodiSimpleStream] Best score {best_score} below threshold {min_score}, picker disabled", xbmc.LOGINFO)
-            _no_source_found()
+            _no_source_found(best_score, min_score)
             return
         xbmc.log(f"[KodiSimpleStream] Best score {best_score} below threshold {min_score}, showing source picker", xbmc.LOGINFO)
         # The picker shows the same sources, no second search
@@ -1787,22 +1839,65 @@ def play_best_tmdbh_source(params: Dict[str, Any]) -> None:
     if wanted:
         _fetch_autoplay_details(results, params, limit, cache, fetcher)
     # The first of the best candidates above the threshold that is not a trailer, a part, another year,
-    # of a wrong length or over the bitrate limit; none -> the picker, never a doubtful file
+    # of a wrong length or over the bitrate limit; none -> the picker, never a doubtful file.
+    # When Webshare answers with a file error (e.g. "File temporarily unavailable") the next such candidate is
+    # tried, within FALLBACK_ATTEMPTS tries and FALLBACK_BUDGET seconds; a timeout or a connection error ends it
+    tried: set = set()
+    verified = False  # the token of the last attempt is known to work: no new login for the next file
+    started = 0.0  # when the first attempt began
+    stopped = ""   # why the fallback stopped, for the log
     for candidate in _autoplay_candidates(results, limit):
-        if candidate["score"] < min_score:
+        if candidate["score"] < min_score or candidate["ident"] in tried:
             continue
+        if tried:
+            # Before the rejection check: it must not run for a candidate that is never tried
+            if len(tried) >= FALLBACK_ATTEMPTS:
+                stopped = f"{FALLBACK_ATTEMPTS} attempts used"
+            elif time.monotonic() - started > FALLBACK_BUDGET:
+                stopped = f"time budget of {FALLBACK_BUDGET:g} s used"
+            if stopped:
+                break
         rejection = _autoplay_rejection(candidate, params)
         if not rejection:
-            xbmc.log(f"[KodiSimpleStream] Autoplaying source score={candidate['score']} name={candidate['name']}", xbmc.LOGINFO)
-            play_ident(candidate["ident"])
-            return
+            if tried:
+                xbmc.log(f"[KodiSimpleStream] Trying next source ({len(tried) + 1}/{FALLBACK_ATTEMPTS}) "
+                         f"score={candidate['score']} name={candidate['name']}", xbmc.LOGINFO)
+            else:
+                started = time.monotonic()
+                xbmc.log(f"[KodiSimpleStream] Autoplaying source score={candidate['score']} name={candidate['name']}", xbmc.LOGINFO)
+            tried.add(candidate["ident"])
+            attempt = _request_download_link(candidate["ident"], verified)
+            verified = attempt.verified
+            if attempt.url:
+                play_video(attempt.url)
+                return
+            if attempt.failure != LINK_FILE:
+                # Not the file's fault (timeout, connection, login, no link): another file would not help
+                _fail_playback(attempt)
+                return
+            xbmc.log(f"[KodiSimpleStream] Autoplay source {len(tried)}/{FALLBACK_ATTEMPTS} failed "
+                     f"({attempt.reason or 'file error'}) ident={candidate['ident']}", xbmc.LOGWARNING)
+            continue
         rate = ""
         if rejection == "bitrate":
             rate = f" bitrate={source_ui.bitrate_text(candidate.get('bitrate'), candidate.get('bitrate_estimated'))}"
         xbmc.log(f"[KodiSimpleStream] Autoplay skips ({rejection}) score={candidate['score']}{rate} name={candidate['name']}", xbmc.LOGINFO)
 
+    if tried:
+        # Every file tried failed: say so, the picker would only offer the files that just failed
+        if not stopped:
+            # The loop ran out of candidates; name the limit that was reached anyway, if any
+            if len(tried) >= FALLBACK_ATTEMPTS:
+                stopped = f"{FALLBACK_ATTEMPTS} attempts used"
+            elif time.monotonic() - started > FALLBACK_BUDGET:
+                stopped = f"time budget of {FALLBACK_BUDGET:g} s used"
+        xbmc.log(f"[KodiSimpleStream] Autoplay gave up after {len(tried)} failed source(s): "
+                 f"{stopped or 'no further candidate'}", xbmc.LOGINFO)
+        _tell_no_source(_addon.getLocalizedString(30148))  # "The files for this title are not available right now"
+        xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
+        return
     if _no_picker():
-        _no_source_found()
+        _no_source_found(best_score, min_score)
         return
     xbmcgui.Dialog().notification(
         _addon.getAddonInfo("name"),

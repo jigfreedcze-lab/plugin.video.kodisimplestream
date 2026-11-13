@@ -336,7 +336,7 @@ msgstr "V dětském režimu není dostupné"
 
 msgctxt "#30111"
 msgid "No suitable source found"
-msgstr "Nenalezen vhodný zdroj"
+msgstr "K tomuto titulu se nenašel vhodný zdroj"
 
 msgctxt "#30126"
 msgid "New search"
@@ -401,3 +401,19 @@ msgstr "Nevhodné pro věk {}"
 msgctxt "#30144"
 msgid "Not rated, not suitable for age {}"
 msgstr "Nehodnoceno, nevhodné pro věk {}"
+
+msgctxt "#30145"
+msgid "No matching file found on Webshare (best match {}%, {}% needed)"
+msgstr "Na Webshare se nenašel odpovídající soubor (nejlepší shoda {} %, potřeba {} %)"
+
+msgctxt "#30146"
+msgid "Nothing found on Webshare for this title"
+msgstr "Na Webshare se k tomuto titulu nic nenašlo"
+
+msgctxt "#30147"
+msgid "The files found do not fit (another title, length or too high a bitrate)"
+msgstr "Nalezené soubory nevyhovují (jiný titul, délka nebo příliš velký datový tok)"
+
+msgctxt "#30148"
+msgid "The files for this title are not available right now, try again later"
+msgstr "Soubory k tomuto titulu jsou právě nedostupné, zkuste to později"

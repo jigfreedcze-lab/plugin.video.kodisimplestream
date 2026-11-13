@@ -42,6 +42,7 @@ class ListItem:
 selects, inputs = [], []
 class Dialog:
     def notification(self, heading, msg, icon=None, ms=None): log.append(("notif", msg))
+    def ok(self, heading, msg): log.append(("ok", msg))
     def select(self, heading, labels, preselect=-1, *a): log.append(("select", tuple(labels), preselect)); return selects.pop(0)
     def input(self, heading, default=""): log.append(("input", default)); return inputs.pop(0)
 
@@ -560,3 +561,144 @@ Addon.settings["tmdbh_auto_play_best"] = ""
 selects[:] = [1]; assert tmdbh_events(dict(tm, select="1")) == ["select", "resolved"] and api.links[-1] == "G", log
 Addon.settings.update(tmdbh_auto_play_min_score="")
 print("přehrávač s výběrem zdroje: OK")
+
+# 25. Automatické přehrání: po JASNÉ chybě souboru (WebshareStatusError, např. FILE_LINK_FATAL_4) další nejlepší
+#     kandidát, nejvýš 3 pokusy a nový pokus se nezačne po FALLBACK_BUDGET s od začátku prvního; timeout, chyba
+#     spojení, přihlášení ani prázdný odkaz bez chyby další pokus nespustí; kandidát pod prahem, odmítnutý či
+#     duplicitní se nezkouší (a odmítnutí se nevolá pro toho, kdo se nezkusí); vypršelý token není chyba souboru
+class PerIdent(FakeAPI):
+    """get_download_link by ident: a link, an exception, or a function of the token returning one of them."""
+    def __init__(self, outcomes):
+        FakeAPI.__init__(self); self.outcomes = outcomes
+    def get_download_link(self, ident):
+        self.links.append(ident); self.link_tokens.append(self.token)
+        out = self.outcomes.get(ident, f"https://dl/{ident}")
+        out = out(self.token) if callable(out) else out
+        if isinstance(out, Exception):
+            raise out
+        return out
+def fatal(): return WebshareStatusError("Webshare file_link/ returned FATAL: File temporarily unavailable. (FILE_LINK_FATAL_4)",
+                                        "File temporarily unavailable.", "FILE_LINK_FATAL_4")
+clock = [100.0]
+def slow(seconds, out):
+    """The attempt takes this long (the fake monotonic clock), then ends with out."""
+    return lambda token: (clock.__setitem__(0, clock[0] + seconds), out)[1]
+def cand(ident, score=95): return {"ident": ident, "name": f"{ident}.1080p.mkv", "score": score}
+rejected, asked_rejection = set(), []
+def fake_rejection(candidate, params_):
+    asked_rejection.append(candidate["ident"]); return "year" if candidate["ident"] in rejected else ""
+real_funcs = {n: getattr(k, n) for n in ("search_and_score_tmdbh", "_apply_tmdbh_details", "_fetch_autoplay_details", "_details_cache",
+                                         "_autoplay_rejection", "time")}
+k._apply_tmdbh_details = lambda *a: None; k._fetch_autoplay_details = lambda *a: None; k._details_cache = lambda: None
+k._autoplay_rejection = fake_rejection
+k.time = types.SimpleNamespace(monotonic=lambda: clock[0], time=time.time)
+Addon.settings.update(tmdbh_auto_play_min_score="80", username="u", password="p")
+def best(rows, outcomes, token=None):
+    """play_best_tmdbh_source over the given rows; returns (api, the events without log lines)."""
+    api = PerIdent(outcomes); k.get_api = lambda: api; k.search_and_score_tmdbh = lambda params_, query=None, capped=True: rows
+    Window.props.clear(); log.clear(); asked_rejection.clear(); clock[0] = 100.0
+    if token:
+        Window.props[k.TOKEN_PROPERTY] = token
+    k.play_best_tmdbh_source(tm)
+    return api, [e for e in log if e[0] != "log"]
+def logged(text): return any(e[0] == "log" and text in e[1] for e in log)
+ABCD = [cand("A"), cand("B"), cand("C"), cand("D")]
+GAVE_UP = [("ok", "#30148"), ("resolved", False, "")]
+
+# bez chyby: jediný pokus, jediné přihlášení, žádné další dotazy ani rejection pro další řádky
+api, ev = best(ABCD, {})
+assert ev == [("resolved", True, "https://dl/A")] and api.links == ["A"] and api.logins == ["u"] and asked_rejection == ["A"], (ev, api.links)
+assert not logged("Trying next source")
+# chyba souboru u prvního → přehraje se druhý (bez nového přihlášení, token z okna)
+api, ev = best(ABCD, {"A": fatal()})
+assert ev == [("resolved", True, "https://dl/B")] and api.links == ["A", "B"] and api.logins == ["u"], (ev, api.links, api.logins)
+assert logged("file_link failed for A") and logged("Trying next source (2/3)") and not logged("(3/3)")
+# dvě chyby → třetí
+api, ev = best(ABCD, {"A": fatal(), "B": fatal()})
+assert ev == [("resolved", True, "https://dl/C")] and api.links == ["A", "B", "C"] and logged("Trying next source (3/3)"), (ev, api.links)
+# tři chyby → dialog 30148 a neúspěšný resolve; čtvrtý řádek se nezkouší ani neposuzuje (nejvýš 3 pokusy)
+api, ev = best(ABCD, {"A": fatal(), "B": fatal(), "C": fatal()})
+assert ev == GAVE_UP and api.links == ["A", "B", "C"] and asked_rejection == ["A", "B", "C"], (ev, api.links, asked_rejection)
+assert logged("3 attempts used") and not any(e[0] == "notif" for e in log)
+# žádný další kandidát: dialog 30148 (ne výběr zdroje, ani s vypnutým tmdbh_no_picker)
+api, ev = best(ABCD[:2], {"A": fatal(), "B": fatal()})
+assert ev == GAVE_UP and api.links == ["A", "B"] and logged("no further candidate"), (ev, log)
+api, ev = best(ABCD[:1], {"A": fatal()})
+assert ev == GAVE_UP and api.links == ["A"], ev
+# timeout / chyba spojení: žádný další pokus, stará hláška
+api, ev = best(ABCD, {"A": WebshareError("Webshare did not respond in time")})
+assert ev == [("notif", "Webshare did not respond in time"), ("resolved", False, "")] and api.links == ["A"], (ev, api.links)
+api, ev = best(ABCD, {"A": ConnectionError("down")})
+assert ev == [("notif", "BEZ ODKAZU"), ("resolved", False, "")] and api.links == ["A"], ev
+api, ev = best(ABCD, {"A": fatal(), "B": WebshareError("Webshare did not respond in time")})  # i u dalšího pokusu
+assert ev == [("notif", "Webshare did not respond in time"), ("resolved", False, "")] and api.links == ["A", "B"], ev
+# prázdný odkaz bez chyby není vina souboru
+api, ev = best(ABCD, {"A": ""})
+assert ev == [("notif", "BEZ ODKAZU"), ("resolved", False, "")] and api.links == ["A"], ev
+# neúspěšné přihlášení: hláška z login_api, žádný pokus o odkaz, žádný další kandidát
+class BadLoginIdent(PerIdent):
+    def login(self, user, password): raise WebshareStatusError("Webshare login/ returned FATAL: Bad password (LOGIN_FATAL_1)")
+api = BadLoginIdent({}); k.get_api = lambda: api; k.search_and_score_tmdbh = lambda params_, query=None, capped=True: ABCD
+Window.props.clear(); log.clear(); k.play_best_tmdbh_source(tm)
+assert [e for e in log if e[0] != "log"] == [("notif", "#30006"), ("resolved", False, "")] and api.links == [], log
+
+# časový rozpočet: nový pokus se nezačne, když od začátku prvního uplynulo víc než FALLBACK_BUDGET (měřeno
+# monotonic hodinami; pokus samotný se nezkracuje)
+assert k.FALLBACK_BUDGET == 8.0 and k.FALLBACK_ATTEMPTS == 3
+api, ev = best(ABCD, {"A": slow(8.01, fatal())})
+assert ev == GAVE_UP and api.links == ["A"] and asked_rejection == ["A"] and logged("time budget"), (ev, api.links, asked_rejection)
+api, ev = best(ABCD, {"A": slow(8.0, fatal())})  # právě 8 s: ještě se smí
+assert ev == [("resolved", True, "https://dl/B")] and api.links == ["A", "B"], (ev, api.links)
+api, ev = best(ABCD, {"A": slow(3, fatal()), "B": slow(5.5, fatal())})  # rozpočet se počítá od prvního pokusu
+assert ev == GAVE_UP and api.links == ["A", "B"] and asked_rejection == ["A", "B"] and logged("time budget"), (ev, api.links)
+api, ev = best(ABCD, {"A": slow(3, fatal()), "B": slow(4, fatal())})
+assert ev == [("resolved", True, "https://dl/C")] and api.links == ["A", "B", "C"], ev
+# čas před prvním pokusem (hledání, detaily) do rozpočtu nepatří: hodiny se pohnou před voláním, start až s pokusem
+k.search_and_score_tmdbh = lambda params_, query=None, capped=True: (clock.__setitem__(0, clock[0] + 50), ABCD)[1]
+api = PerIdent({"A": fatal()}); k.get_api = lambda: api; Window.props.clear(); log.clear(); k.play_best_tmdbh_source(tm)
+assert api.links == ["A", "B"] and log[-1] == ("resolved", True, "https://dl/B"), api.links
+
+# pod prahem, odmítnutý a duplicitní kandidát se nezkouší
+rows = [cand("A"), cand("L", 50), cand("R"), cand("A"), cand("D", 90), cand("E", 85)]
+rejected.add("R")
+api, ev = best(rows, {"A": fatal()})
+assert ev == [("resolved", True, "https://dl/D")] and api.links == ["A", "D"] and asked_rejection == ["A", "R", "D"], (ev, api.links, asked_rejection)
+api, ev = best(rows[:3] + rows[4:], {"A": fatal(), "D": fatal(), "E": fatal()})  # without the duplicate: 5 slots
+assert ev == GAVE_UP and api.links == ["A", "D", "E"], api.links
+api, ev = best([cand("A"), cand("L", 50), cand("R")], {"A": fatal()})  # po A zbývá jen pod prahem a odmítnutý
+assert ev == GAVE_UP and api.links == ["A"] and "L" not in asked_rejection, (ev, asked_rejection)
+rejected.clear()
+
+# vypršelý token: nové přihlášení v rámci jednoho pokusu, ne chyba souboru
+expired_a = lambda token: fatal() if token == "old" else "https://dl/A"
+api, ev = best(ABCD, {"A": expired_a}, token=stored.replace("tok1", "old"))
+assert ev == [("resolved", True, "https://dl/A")] and api.links == ["A", "A"] and api.link_tokens == ["old", "tok1"] and api.logins == ["u"], (ev, api.link_tokens)
+assert not logged("Trying next source")
+# vypršelý token a po novém přihlášení stejně chyba souboru: počítá se za JEDEN pokus, pak další kandidát
+api, ev = best(ABCD, {"A": fatal()}, token=stored.replace("tok1", "old"))
+assert ev == [("resolved", True, "https://dl/B")] and api.links == ["A", "A", "B"] and api.link_tokens == ["old", "tok1", "tok1"], (ev, api.links)
+assert logged("Trying next source (2/3)") and not logged("(3/3)")
+# token se nikdy nelogí
+api, ev = best(ABCD, {"A": fatal(), "B": fatal(), "C": fatal()}, token=stored.replace("tok1", "tokSECRET"))
+assert not logged("tokSECRET") and not logged("tok1") and ev == GAVE_UP, log
+
+# dětský režim: stejně, kontrola věku (první věc v tmdbh_play) proběhne jednou na celé přehrávání
+Addon.settings.update(kids_only="true", tmdbh_auto_play_best="true")
+age_checks = []
+real_kids = k._kids_playback_allowed; real_english = k._add_english_title
+k._kids_playback_allowed = lambda params_: age_checks.append(1) or True; k._add_english_title = lambda params_: None
+api = PerIdent({"A": fatal(), "B": fatal()}); k.get_api = lambda: api; k.search_and_score_tmdbh = lambda params_, query=None, capped=True: ABCD
+Window.props.clear(); log.clear(); k.tmdbh_play(tm)
+assert [e for e in log if e[0] != "log"] == [("resolved", True, "https://dl/C")] and api.links == ["A", "B", "C"] and age_checks == [1], (log, age_checks)
+api = PerIdent({"A": fatal(), "B": fatal(), "C": fatal()}); k.get_api = lambda: api
+Window.props.clear(); log.clear(); age_checks.clear(); k.tmdbh_play(tm)
+assert [e for e in log if e[0] != "log"] == GAVE_UP and age_checks == [1], (log, age_checks)
+k._kids_playback_allowed = real_kids; k._add_english_title = real_english
+Addon.settings.update(kids_only="", tmdbh_auto_play_best="", tmdbh_auto_play_min_score="")
+
+# přímý play_ident (nabídka, výběr zdroje) fallback nemá: jedna chyba souboru = jako dřív
+api = PerIdent({"A": fatal()}); k.get_api = lambda: api; Window.props.clear(); log.clear(); k.play_ident("A")
+assert [e for e in log if e[0] != "log"] == [("notif", "Webshare: File temporarily unavailable."), ("resolved", False, "")] and api.links == ["A"]
+for name, func in real_funcs.items():
+    setattr(k, name, func)
+print("automatické přehrání: další zdroj po chybě souboru: OK")

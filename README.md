@@ -189,6 +189,17 @@ Omezení:
   zakázané tituly tam uvidí, jen se nepřehrají. Doporučení: v dětském profilu skinu skrýt sekci Doplňky (video
   doplňky) nebo ji zamknout, ať se dítě k TMDb Helperu vůbec nedostane. Zámek nastavení Kodi, profilu, rodičovskou kontrolu a skrytí položek v
   tapetě (skinu) nastavuje Kodi a skin, tento doplněk je nenahrazuje.
+- **Co má rodič zamknout v Kodi** (doplněk to sám zajistit nemůže):
+  - **Nastavení:** nastavení doplňku (včetně vypnutí dětského režimu a věku) jde změnit jen přes Nastavení Kodi. V
+    *Nastavení → Profily → Hlavní zámek* nastavte kód a u dětského profilu zamkněte *Nastavení a správce souborů*.
+  - **Ovládání zvenčí:** JSON-RPC, webové rozhraní, Kore, UPnP a AirPlay (*Nastavení → Služby → Ovládání*) umí přehrát
+    libovolnou adresu a kontrola věku se pak neuplatní u podstrčeného názvu. Vypněte je nebo je dejte pod heslo.
+  - **TMDb Helper a jiné přehrávače:** kontrola věku platí jen pro přehrávač KodiSimpleStream. Jiný přehrávač v
+    TMDb Helperu, jiný video doplněk nebo knihovna Kodi ji obejdou. Seriálové výsledky dětského hledání se otevírají
+    v TMDb Helperu, takže se dítě k jeho nabídkám dostane i tak.
+  - **Soubory:** `addon_data` (nastavení doplňku, heslo Webshare, TMDb klíč) je čitelné ve Správci souborů.
+  - **Shoda souboru s titulem:** zdroj se vybírá podle názvu souboru na Webshare. Špatně pojmenovaný soubor se může
+    přehrát, i když neodpovídá titulu.
 
 ### Podpora
 Pokud narazíte na problémy nebo máte otázky:
@@ -241,6 +252,11 @@ Nová nastavení addonu (sekce **TMDb Helper**):
   přehrání skončí. Hodí se pro děti, které by si neuměly vybrat. V dětském režimu platí vždy.
 - **Auto-play best source** – automaticky přehraje nejlépe skórovaný zdroj.
 - **Auto-play minimum score** – minimální skóre, od kterého dojde k auto-play.
+- **Další zdroj při chybě souboru:** když Webshare u vybraného souboru vrátí jasnou chybu (např. „File temporarily
+  unavailable“), auto-play zkusí dalšího nejlepšího kandidáta (jen nad prahem shody a s týmiž kontrolami jako první
+  volba). Nejvýš 3 pokusy a nový pokus se nezačne, když od prvního uplynulo víc než 8 s. Při timeoutu, chybě spojení
+  nebo přihlášení se nezkouší nic dalšího. Když se nic nepodaří, ukáže se dialog „Soubory k tomuto titulu jsou právě
+  nedostupné, zkuste to později“.
 - **Auto-play maximum bitrate** – nejvyšší průměrný datový tok v Mbit/s, který auto-play ještě spustí (výchozí 30,
   0 = bez omezení). Brání tomu, aby se automaticky pustil třeba 60GB 4K remux (50–80 Mbit/s), který připojení
   nestihne přenášet a video se zasekává. Nastavte ho asi na dvě třetiny rychlosti připojení (pro 50 Mbit/s tedy 30).
