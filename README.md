@@ -137,7 +137,7 @@ Nastavení (sekce **Dětské hledání**):
 - **Tituly bez věkového hodnocení** (`kids_unrated`: zakázat / povolit, výchozí zakázat) – co se stane s titulem,
   u kterého TMDb nezná žádné použitelné hodnocení.
 - **Dětský režim** (`kids_only`, vypnuto) – hledání filtruje podle věku a doplněk nabídne jen dětské hledání a odmítne všechno ostatní kromě
-  přehrání z TMDb Helperu (hledání na Webshare i v TMDb, výběr titulu, epizody, náhledy, detaily souborů, přímé
+  přehrání z TMDb Helperu (to před startem zkontroluje věk titulu, viz níže) (hledání na Webshare i v TMDb, výběr titulu, epizody, náhledy, detaily souborů, přímé
   přehrání). V tomto režimu se nikdy neukáže ani výběr zdroje (jako se zapnutým `tmdbh_no_picker`).
   Při **vypnutém** dětském režimu se věk dítěte, přísnost, minimum hlasů, žánry ani nehodnocené tituly nepoužijí
   (hledání najde všechno, kromě titulů pro dospělé podle TMDb); platí jen **Řazení výsledků** (`kids_sort`) a
@@ -179,8 +179,15 @@ Omezení:
   nezobrazí; po povolení **Tituly bez věkového hodnocení** projdou i nehodnocené tituly, třeba pro dospělé.
 - Údaje na TMDb (žánry, hodnocení) nejsou dokonalé a špatné hodnocení z jedné země titul zablokuje. Filtr je
   pomůcka, ne záruka. Spolehlivý seznam jsou oblíbené položky (Favourites), které si rodič vybere sám.
-- Filtr platí jen pro dětské hledání doplňku. Titul, který dětský režim nepustil, jde dál najít v samotném
-  TMDb Helperu nebo v jiných doplňcích. Zámek nastavení Kodi, profilu, rodičovskou kontrolu a skrytí položek v
+- **Kontrola při přehrání:** v dětském režimu se věk titulu ověří i těsně před přehráním přes TMDb Helper
+  (`tmdbh_play`), takže zakázaný titul vybraný jinde (hledání nebo widget v TMDb Helperu) se nepřehraje a ukáže se
+  oznámení „Nevhodné pro věk N“. U seriálu se hodnotí seriál, ne epizoda; rozhoduje věk a zakázané žánry (**Minimum
+  hlasů** se při přehrání nepoužije) a **Tituly bez věkového hodnocení** se řídí nastavením jako v hledání. Zjistí se
+  TMDb id (případně z IMDb id přes TMDb `/find`); bez TMDb API klíče, při chybě sítě nebo TMDb či když titul nejde
+  určit, se přehrání zamítne. Kontrola stojí 1 až 2 dotazy na TMDb navíc, při vypnutém dětském režimu žádný.
+- **TMDb Helper sám věk nefiltruje.** Prohlížení v něm (jeho hledání, widgety, seznamy) zůstává dětem dostupné a
+  zakázané tituly tam uvidí, jen se nepřehrají. Doporučení: v dětském profilu skinu skrýt sekci Doplňky (video
+  doplňky) nebo ji zamknout, ať se dítě k TMDb Helperu vůbec nedostane. Zámek nastavení Kodi, profilu, rodičovskou kontrolu a skrytí položek v
   tapetě (skinu) nastavuje Kodi a skin, tento doplněk je nenahrazuje.
 
 ### Podpora

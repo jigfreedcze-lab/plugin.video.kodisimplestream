@@ -171,6 +171,18 @@ class TMDB:
         append = "release_dates" if kind == "movie" else "content_ratings"
         return self._get(f"{kind}/{tmdb_id}", append_to_response=append)
 
+    def find_by_imdb(self, imdb_id: str, kind: str):
+        """TMDb id (int) of the movie or series (kind "movie" | "tv") with this IMDb id, None when TMDb does not know it.
+        For a series an episode IMDb id leads to the series too."""
+        if kind not in ("movie", "tv"):
+            raise ValueError(f"Invalid TMDb kind: {kind}")
+        data = self._get(f"find/{imdb_id}", external_source="imdb_id")
+        if kind == "movie":
+            found = (data.get("movie_results") or [{}])[0].get("id")
+        else:
+            found = (data.get("tv_results") or [{}])[0].get("id") or (data.get("tv_episode_results") or [{}])[0].get("show_id")
+        return found if isinstance(found, int) and not isinstance(found, bool) else None
+
     def details_extras(self, kind: str, tmdb_id) -> Dict:
         """Posters and translations of a title (heavy, so only for titles that are listed)."""
         if kind not in ("movie", "tv"):

@@ -393,3 +393,11 @@ msgstr "Hledat filmy a seriály"
 msgctxt "#30142"
 msgid "Trakt (watchlist, watched...)"
 msgstr "Trakt (seznam, zhlédnuto…)"
+
+msgctxt "#30143"
+msgid "Not suitable for age {}"
+msgstr "Nevhodné pro věk {}"
+
+msgctxt "#30144"
+msgid "Not rated, not suitable for age {}"
+msgstr "Nehodnoceno, nevhodné pro věk {}"

@@ -19,6 +19,7 @@ sys.modules["xbmc"] = types.SimpleNamespace(
     LOGDEBUG=0, LOGINFO=1, LOGWARNING=2,
     log=lambda msg, level=0: None,
     executebuiltin=lambda cmd: log.append(("builtin", cmd)),
+    sleep=lambda ms: log.append(("sleep", ms)),
 )
 
 STRINGS = {30007: "Chyba vyhledávání: {}", 30051: "ZADEJ KLÍČ", 30053: "KLÍČ ODMÍTNUT"}
@@ -53,7 +54,8 @@ sys.modules["xbmcgui"] = types.SimpleNamespace(Dialog=Dialog, ListItem=ListItem,
 items = []
 sys.modules["xbmcplugin"] = types.SimpleNamespace(
     addDirectoryItem=lambda h, url, item, isFolder=False: items.append((url, item, isFolder)),
-    endOfDirectory=lambda h, succeeded=True, updateListing=False: (log.append(("end", succeeded)), updates.append(updateListing)),
+    endOfDirectory=lambda h, succeeded=True, updateListing=False, cacheToDisc=True: (
+        log.append(("end", succeeded) if cacheToDisc else ("end", succeeded, "nocache")), updates.append(updateListing)),
     setResolvedUrl=lambda h, ok, item: log.append(("resolved", ok)),
     setContent=lambda *a: None, addSortMethod=lambda *a: None, SORT_METHOD_NONE=0,
 )
@@ -94,20 +96,41 @@ k.get_tmdb = lambda: tmdb_client
 keyboard = []
 k._keyboard_search = lambda label_id: (log.append(("keyboard", label_id)), keyboard.pop(0))[1]
 
-# the keyboard hands the search over to a URL with the query (a Container.Refresh must not ask again)
+# --- keyboard hands the search over, called as a folder (_handle >= 0: old favourite, widget, skin shortcut) ---
+# The call ends successfully with an empty listing (a failed one makes Kodi re-open the URL and ask again),
+# then the update replaces it; the order keyboard -> end -> sleep -> update matters.
+BASE = "plugin://plugin.video.kodisimplestream/?action=kids_search"
 n = len(calls); log.clear(); items.clear(); keyboard[:] = ["princ"]
 k.router("action=kids_search")
-assert log == [("keyboard", 30108), ("builtin", "Container.Update(plugin://plugin.video.kodisimplestream/?action=kids_search&query=princ)"),
-               ("end", False)] and len(calls) == n and not items, log
+assert log == [("keyboard", 30108), ("end", True, "nocache"), ("sleep", 300),
+               ("builtin", f"Container.Update({BASE}&query=princ,replace)")] and len(calls) == n and not items, log
+# the query URL of the fallback carries no replace=1 (",replace" fixes the history)
 log.clear(); keyboard[:] = ["bluey"]
 k.router("action=kids_search&type=tv&replace=1")
-assert log[1] == ("builtin", "Container.Update(plugin://plugin.video.kodisimplestream/?action=kids_search&type=tv&query=bluey&replace=1)"), log
+assert log == [("keyboard", 30108), ("end", True, "nocache"), ("sleep", 300),
+               ("builtin", f"Container.Update({BASE}&type=tv&query=bluey,replace)")], log
+
+# --- the same as a script (_handle -1: an item of the menu or "New search"): no end, no sleep ---
+k._handle = -1
+n = len(calls); log.clear(); items.clear(); keyboard[:] = ["princ"]
+k.router("action=kids_search")
+assert log == [("keyboard", 30108), ("builtin", f"Container.Update({BASE}&query=princ)")] and len(calls) == n and not items, log
+# "New search" from the results (replace=1): kept in the URL so the new results replace the old ones
+log.clear(); keyboard[:] = ["bluey"]
+k.router("action=kids_search&type=tv&replace=1")
+assert log == [("keyboard", 30108), ("builtin", f"Container.Update({BASE}&type=tv&query=bluey&replace=1)")], log
+# cancelled or empty keyboard: nothing at all (no end, no builtin, no sleep)
+for typed in (None, "", "   "):
+    log.clear(); keyboard[:] = [typed]; k.router("action=kids_search&replace=1")
+    assert log == [("keyboard", 30108)] and len(calls) == n, (typed, log)
+k._handle = 1
 # the refresh of that URL (Trakt context menu) lists the same results without the keyboard
 log.clear(); items.clear(); keyboard[:] = []
 k.router("action=kids_search&query=princ")
 assert log == [("end", True)] and calls[-1][:2] == ("princ", ["movie", "tv"]), (log, calls[-1])
 (urln, itemn, foldern), (url1, item1, folder1), (url2, item2, folder2) = items
-assert urln == "plugin://plugin.video.kodisimplestream/?action=kids_search&replace=1" and foldern is True and itemn.label == "#30126", items
+assert urln == "plugin://plugin.video.kodisimplestream/?action=kids_search&replace=1" and foldern is False and itemn.label == "#30126", items
+assert "IsPlayable" not in itemn.props, itemn.props  # a script item: neither a folder nor playable
 assert updates[-1] is False, updates
 assert url1 == TMDBH + "?info=play&tmdb_type=movie&tmdb_id=123" and folder1 is False and item1.props.get("IsPlayable") == "true", items
 assert item1.label == "Malý princ (2015)  [8+]", item1.label
@@ -132,12 +155,25 @@ keyboard[:] = ["   "]; log.clear(); k.router("action=kids_search"); assert len(c
 # no results: a notification and an empty directory
 fake_search.result = []; log.clear(); items.clear(); k.router("action=kids_search&query=nic")
 assert log == [("notif", "#30109"), ("end", True)] and [i[0] for i in items] == ["plugin://plugin.video.kodisimplestream/?action=kids_search&replace=1"], (log, items)
+assert [i[2] for i in items] == [False], items
 
-# TMDb errors
-fake_search.result = TMDBAuthError("x"); log.clear(); k.router("action=kids_search&query=a")
-assert log == [("notif", "KLÍČ ODMÍTNUT"), ("end", False)], log
-fake_search.result = ConnectionError("síť"); log.clear(); k.router("action=kids_search&query=a")
-assert log == [("notif", "Chyba vyhledávání: síť"), ("end", False)], log
+# TMDb errors after the query was handed over: a notification and a successful list with just "New search"
+# (a failed directory for a URL with a query could jump to the root of the Videos window)
+for exc, text in ((TMDBAuthError("x"), "KLÍČ ODMÍTNUT"), (ConnectionError("síť"), "Chyba vyhledávání: síť")):
+    fake_search.result = exc; log.clear(); items.clear(); k.router("action=kids_search&query=a")
+    assert log == [("notif", text), ("end", True)], log
+    assert [(i[0], i[1].label, i[2]) for i in items] == [(BASE + "&replace=1", "#30126", False)], items
+# the same with the replace flag: no failed end, the list replaces the old one
+fake_search.result = ConnectionError("síť"); log.clear(); items.clear(); updates.clear()
+k.router("action=kids_search&type=tv&query=a&replace=1")
+assert log == [("notif", "Chyba vyhledávání: síť"), ("end", True)] and updates == [True] and len(items) == 1, (log, updates)
+assert items[0][0] == BASE + "&type=tv&replace=1", items
+# a script call (handle -1): the error is still notified and the list is built without a failed end
+k._handle = -1
+fake_search.result = ConnectionError("síť"); log.clear(); items.clear(); updates.clear()
+k.router("action=kids_search&type=tv&query=a&replace=1")
+assert log[0] == ("notif", "Chyba vyhledávání: síť") and ("end", False) not in log and len(items) == 1, (log, items)
+k._handle = 1
 _old_key = Addon.settings.get("tmdb_api_key")
 Addon.settings["tmdb_api_key"] = "SECRETKEY0123456789abcdef"
 fake_search.result = ConnectionError("HTTPSConnectionPool: /3/search/movie?api_key=SECRETKEY0123456789abcdef&query=x failed")
@@ -183,8 +219,11 @@ print("config wiring: checks passed")
 Addon.settings["kids_only"] = "true"
 log.clear(); items.clear(); k.router("")
 base = "plugin://plugin.video.kodisimplestream/?action=kids_search"
-assert [(i[0], i[1].label, i[2]) for i in items] == [(base, "#30137", True), (base + "&type=movie", "#30138", True),
-                                                   (base + "&type=tv", "#30139", True)] and log == [("end", True)], (items, log)
+assert [(i[0], i[1].label, i[2]) for i in items] == [(base, "#30137", False), (base + "&type=movie", "#30138", False),
+                                                   (base + "&type=tv", "#30139", False)]
+# script items, not playable
+assert all("IsPlayable" not in i[1].props for i in items), items
+assert log == [("end", True)], (items, log)
 
 called = []
 BLOCKED = {  # action -> (paramstring, name of the function that must not run)
@@ -241,6 +280,7 @@ Addon.settings["tmdb_api_key"] = _key
 # the submenu: everything / movies / series
 items.clear(); k.router("action=kids_menu")
 assert [i[0].split("action=")[1] for i in items] == ["kids_search", "kids_search&type=movie", "kids_search&type=tv"], items
+assert [i[2] for i in items] == [False] * 3 and all("IsPlayable" not in i[1].props for i in items), items
 print("kids_only: checks passed")
 
 # --- tmdbh_no_picker ---
@@ -295,6 +335,7 @@ for flag in ("false", "true"):
     ev, lg = run_best(RESULTS, flag); assert ev == [("play", "i1")], (flag, ev)
 # kids_only implies no picker (the picker lists raw file names, and its items are play_ident, which kids mode refuses)
 Addon.settings.update(tmdbh_no_picker="false", kids_only="true", tmdbh_auto_play_best="false")
+k._kids_playback_allowed = lambda params: True  # the age check at playback has its own test (test_kids_play.py)
 for select in (None, "1"):
     events.clear()
     k.tmdbh_play(dict(PARAMS, **({"select": select} if select else {})))

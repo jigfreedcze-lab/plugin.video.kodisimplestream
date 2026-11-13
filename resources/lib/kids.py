@@ -8,7 +8,7 @@ country outside the table that clearly reads as 16+ (18+, R18+, 19, X ...) rejec
 import math
 import re
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Dict, List, Optional, Tuple
 
 IMAGE_URL = "https://image.tmdb.org/t/p/w500"
@@ -243,7 +243,7 @@ def evaluate(kind, details, cfg: KidsConfig) -> Verdict:
 
     placed = {}  # country -> (age, label): the strictest rating we could place for that country
     foreign = None  # a real rating from a country outside the table
-    foreign_adult = None  # (age, label): the strictest outside-table rating that clearly reads as 16+
+    foreign_adult = {}  # country -> (age, label): outside-table countries whose rating clearly reads as 16+
     for country, cert in ratings_of(kind, details):
         if is_no_rating(country, cert):
             continue
@@ -251,16 +251,20 @@ def evaluate(kind, details, cfg: KidsConfig) -> Verdict:
         if table is None:
             foreign = foreign or f"{country} {cert}"  # cannot be placed, so it must not count as "unrated"
             read_age = foreign_min_age(cert)
-            if read_age is not None and (foreign_adult is None or read_age > foreign_adult[0]):
-                foreign_adult = (read_age, f"{country} {cert}")
+            if read_age is not None and (country not in foreign_adult or read_age > foreign_adult[country][0]):
+                foreign_adult[country] = (read_age, f"{country} {cert}")
             continue
         age = table.get(normalise(cert))
         if age is None:
             return Verdict(False, "unplaced rating", label=f"{country} {cert}")  # never guess: fail closed
         if country not in placed or age > placed[country][0]:
             placed[country] = (age, f"{country} {cert}")  # one vote per country: its strictest rating
-    if foreign_adult and foreign_adult[0] > cfg.age:
-        return Verdict(False, "age too high", foreign_adult[0], foreign_adult[1])  # never ignored, never guessed
+    # Countries outside the table cast no vote on their own (RU rates The Simpsons 18+ while everyone else says 12).
+    # But when two or more of them clearly agree on 16+, they cannot be ignored.
+    too_high = [e for e in foreign_adult.values() if e[0] > cfg.age]
+    if len(too_high) >= 2:
+        strictest_foreign = max(too_high, key=lambda e: e[0])
+        return Verdict(False, "age too high", strictest_foreign[0], strictest_foreign[1])
     if not placed:
         strictest = None
     else:
@@ -280,6 +284,13 @@ def evaluate(kind, details, cfg: KidsConfig) -> Verdict:
     if strictest[0] > cfg.age:
         return Verdict(False, "age too high", strictest[0], strictest[1])
     return Verdict(True, "age ok", strictest[0], strictest[1])
+
+
+def evaluate_playback(kind, details, cfg: KidsConfig) -> Verdict:
+    """The decision at playback time: the same as evaluate(), but the minimum of votes does not count.
+    It only hides obscure titles from a search list; it is no safety property, a title the child picked in
+    another add-on must not be refused for being little known. Age and genres decide."""
+    return evaluate(kind, details, replace(cfg, min_votes=0))
 
 
 def _best_poster(item, details) -> Optional[str]:

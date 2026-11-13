@@ -393,3 +393,11 @@ msgstr "Search movies and series"
 msgctxt "#30142"
 msgid "Trakt (watchlist, watched...)"
 msgstr "Trakt (watchlist, watched…)"
+
+msgctxt "#30143"
+msgid "Not suitable for age {}"
+msgstr "Not suitable for age {}"
+
+msgctxt "#30144"
+msgid "Not rated, not suitable for age {}"
+msgstr "Not rated, not suitable for age {}"

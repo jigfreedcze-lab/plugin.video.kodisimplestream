@@ -339,16 +339,25 @@ class EvaluateTests(unittest.TestCase):
         verdict = self.ev(movie({"JP": ["G"]}), age=8)
         self.assertEqual(verdict.reason, "unplaced rating")
 
-    def test_adult_rating_outside_table_rejects(self):
-        for country, cert in (("JP", "R18+"), ("JP", "R-18"), ("KR", "19"), ("RU", "18+"), ("TH", "X"),
-                              ("KR", "18"), ("MX", "+16"), ("XX", "NC-17")):
+    def test_single_adult_rating_outside_table_does_not_decide(self):
+        # one country outside the table must not sink a title the rest of the world rates as harmless
+        # (RU 18+ for The Simpsons)
+        for country, cert in (("JP", "R18+"), ("KR", "19"), ("RU", "18+"), ("TH", "X"), ("MX", "+16"), ("XX", "NC-17")):
             verdict = self.ev(movie({country: [cert], "CZ": ["U"]}), age=8)
-            self.assertEqual((verdict.allowed, verdict.reason), (False, "age too high"), (country, cert))
-            self.assertEqual(verdict.label, f"{country} {cert}")
-        self.assertFalse(self.ev(tv({"KR": "19", "CZ": "U"}), "tv", age=8).allowed)
+            self.assertTrue(verdict.allowed, (country, cert, verdict))
+        self.assertTrue(self.ev(tv({"RU": "18+", "CZ": "U", "DE": "12", "US": "TV-PG"}), "tv", age=12).allowed)
+
+    def test_two_countries_outside_table_agreeing_on_adult_reject(self):
+        verdict = self.ev(movie({"JP": ["R18+"], "RU": ["18+"], "CZ": ["U"]}), age=8)
+        self.assertEqual((verdict.allowed, verdict.reason), (False, "age too high"))
+        self.assertIn(verdict.label, ("JP R18+", "RU 18+"))
+        self.assertFalse(self.ev(tv({"KR": "19", "TH": "X", "CZ": "U"}), "tv", age=8).allowed)
         # an older child may still see it
-        self.assertTrue(self.ev(movie({"KR": ["16"], "CZ": ["U"]}), age=16).allowed)
-        self.assertFalse(self.ev(movie({"KR": ["19"], "CZ": ["U"]}), age=18).allowed)
+        self.assertTrue(self.ev(movie({"KR": ["16"], "RU": ["16+"], "CZ": ["U"]}), age=16).allowed)
+        # only the countries above the child's age count: RU 18+ is no more than 18, so just KR 19 is left
+        self.assertTrue(self.ev(movie({"KR": ["19"], "RU": ["18+"], "CZ": ["U"]}), age=18).allowed)
+        # the same country twice is still one country
+        self.assertTrue(self.ev(movie({"RU": ["18+", "R18+"], "CZ": ["U"]}), age=8).allowed)
         # JP R18+ + KR 19 + RU 18+ + CZ U (the reviewed bypass)
         self.assertFalse(self.ev(movie({"JP": ["R18+"], "KR": ["19"], "RU": ["18+"], "CZ": ["U"]}), age=8).allowed)
 
