@@ -16,6 +16,17 @@ FAKE = {
     "tv/2": {"id": 2, "content_ratings": {"results": []}},
 }
 requests = types.ModuleType("requests"); sys.modules["requests"] = requests
+handler = None  # what the shared session answers with; the checks below swap it
+class FakeCookies:
+    def set_policy(self, policy): self.policy = policy
+class FakeSession:
+    created = []
+    def __init__(self): self.cookies = FakeCookies(); self.gets = 0; FakeSession.created.append(self)
+    def get(self, url, params=None, headers=None, timeout=None):
+        self.gets += 1
+        return handler(url, params, headers, timeout)
+requests.Session = FakeSession
+requests.get = lambda *a, **k: (_ for _ in ()).throw(AssertionError("every TMDb call must go through the shared session"))
 
 
 def fake_get(url, params=None, headers=None, timeout=None):
@@ -24,8 +35,8 @@ def fake_get(url, params=None, headers=None, timeout=None):
     return Resp(FAKE[path]) if path in FAKE else Resp({"status_message": "nope"}, 404)
 
 
-requests.get = fake_get
-from resources.lib.tmdb import TMDB
+handler = fake_get
+from resources.lib.tmdb import TMDB, PLAYBACK_TIMEOUT
 
 t = TMDB("0123456789abcdef0123456789abcdef")
 res = t.search_raw("kocour", "movie", page=3)
@@ -60,7 +71,7 @@ except ValueError: pass
 
 # HTTP errors: 401 is an auth error, other 4xx a plain failure, a non-JSON answer raises as well
 FAKE_CODES = {"movie/401": 401, "movie/500": 500}
-_ok_get = requests.get
+_ok_get = handler
 
 
 def coded_get(url, params=None, headers=None, timeout=None):
@@ -76,7 +87,7 @@ def coded_get(url, params=None, headers=None, timeout=None):
     return _ok_get(url, params, headers, timeout)
 
 
-requests.get = coded_get
+handler = coded_get
 from resources.lib.tmdb import TMDBAuthError
 try: t.details_extras("movie", 401); raise SystemExit("missing auth error")
 except TMDBAuthError: pass
@@ -88,5 +99,17 @@ except TMDBAuthError: pass
 try: t.details_extras("movie", "notjson"); raise SystemExit("non-JSON answer must raise")
 except ValueError: pass
 assert t.details_extras("movie", "empty") is None  # an empty body is passed on; kids.build tolerates it
-requests.get = _ok_get
+handler = _ok_get
+
+# the per-call timeout of the playback check reaches the session, the default one stays (connect, read)
+seen = []
+def spy(url, params=None, headers=None, timeout=None):
+    seen.append(timeout); return _ok_get(url, params, headers, timeout)
+handler = spy
+FAKE["find/tt7"] = {"movie_results": [{"id": 1}], "tv_results": [], "tv_episode_results": []}
+t.details_with_ratings("movie", 1); assert seen[-1] == (3.05, 8), seen
+t.details_with_ratings("movie", 1, timeout=PLAYBACK_TIMEOUT); assert seen[-1] == (3.05, 6), seen
+assert t.find_by_imdb("tt7", "movie", timeout=PLAYBACK_TIMEOUT) == 1 and seen[-1] == (3.05, 6), seen
+assert len(FakeSession.created) == 1, "one shared session"
+handler = _ok_get
 print("all kids TMDb checks passed")

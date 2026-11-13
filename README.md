@@ -120,18 +120,28 @@ hledá filmy i seriály.
 Nad výsledky je položka **Nové hledání**, která nahradí aktuální seznam. Mimo dětský režim je v kontextovém menu každého
 výsledku **Trakt (seznam, zhlédnuto…)**, která otevře nabídku Traktu z TMDb Helperu (watchlist, sbírka, zhlédnuto).
 V dětském režimu tato položka v kontextovém menu **není**.
+V dětském režimu je na konci seznamu (u prázdného výsledku hned pod **Novým hledáním**) šedá položka
+**Skryto N titulů (nevhodné pro věk X)**. Počítá jen tituly, které se skryly kvůli věku nebo hodnocení (vyšší věkové
+hodnocení, žádné hodnocení nebo hodnocení, které se nedá zařadit); tituly vyřazené kvůli žánru, počtu hlasů nebo pro
+dospělé se nepočítají. Kliknutí ukáže okno s počty (vyšší hodnocení a od jakého věku by titul prošel nejblíže, bez
+hodnocení) a připomene, že se věk mění v nastavení doplňku. Žádný název skrytého titulu se neukazuje ani nezapisuje do
+logu. Když nic nebylo skryto, položka není. Hláška při prázdném výsledku pak uvede i počet skrytých titulů. Souhrn se
+ukládá do cache výsledků hledání společně s nimi. Vypíná se nastavením **Ukázat řádek s počtem skrytých titulů** (`kids_show_hidden`).
 
 Nastavení (sekce **Dětské hledání**):
 - **Věk dítěte** (`kids_age`, výchozí 8, povolené 3 až 18) – tituly s vyšším věkovým hodnocením se nezobrazí.
   Všechno ostatní se odvodí z tohoto čísla.
-- **Přísnost** (`kids_percentile`, výchozí 75, povolené 50 až 100) – hodnocení se nejdřív sloučí po zemích (za každou
+- **Přísnost** (`kids_percentile`, výchozí 50, povolené 50 až 100) – hodnocení se nejdřív sloučí po zemích (za každou
   zemi platí její nejpřísnější) a z věků zemí se vybere percentil: 100 = rozhoduje nejpřísnější země, 50 =
   medián. Nižší přísnost toleruje jednu odlehlou zemi (chybu v datech), vyšší ji bere vážně. Přesná pravidla (kdy se
   který percentil použije a jak se zachází s nepřehlédnutelně přísnými hodnoceními) se mohou v dalších verzích
-  zpřísnit, proto je zde nepopisujeme. Kdo chce nejopatrnější chování, nastaví 100.
+  zpřísnit, proto je zde nepopisujeme. Kdo chce nejopatrnější chování, nastaví 100. Výchozí hodnota se změnila ze 75 na 50;
+hodnota, kterou už máte v nastavení uloženou, se tím nemění.
 - **Řazení výsledků** (`kids_sort`: relevance (pořadí z TMDb) / popularita / hodnocení / rok vydání, výchozí relevance) a **Nejvíce výsledků**
   (`kids_limit`, výchozí 20, povolené 5 až 60) – týká se jen hledání filmů a seriálů v TMDb, ne řazení souborů na Webshare (`ws_sort`).
   Platí v dětském režimu i bez něj.
+- **Ukázat řádek s počtem skrytých titulů** (`kids_show_hidden`, výchozí zapnuto) – ukáže položku **Skryto N titulů** a počet
+  skrytých titulů v hlášce při prázdném výsledku. Jen v dětském režimu.
 - **Minimum hlasů** (`kids_min_votes`, výchozí 20) – titul s méně hlasy na TMDb se skryje, 0 = bez omezení.
   Jen v dětském režimu.
 - **Tituly bez věkového hodnocení** (`kids_unrated`: zakázat / povolit, výchozí zakázat) – co se stane s titulem,
@@ -185,6 +195,12 @@ Omezení:
   hlasů** se při přehrání nepoužije) a **Tituly bez věkového hodnocení** se řídí nastavením jako v hledání. Zjistí se
   TMDb id (případně z IMDb id přes TMDb `/find`); bez TMDb API klíče, při chybě sítě nebo TMDb či když titul nejde
   určit, se přehrání zamítne. Kontrola stojí 1 až 2 dotazy na TMDb navíc, při vypnutém dětském režimu žádný.
+- **Cache v paměti:** už zjištěný verdikt věku titulu se pamatuje 6 hodin (a výsledky dětského hledání 15 minut), takže
+  opakované přehrání nebo obnovení seznamu (třeba po akci z kontextového menu Trakt) nečeká na TMDb. Titul povolený
+  v hledání se zapamatuje i pro přehrání. Zamítnutí z hledání se pro přehrání neukládá. Cache je jen v paměti Kodi (nic
+  se nezapisuje na disk, po restartu Kodi je prázdná), záznamy jsou podepsané klíčem odvozeným z TMDb API klíče
+  (cizí nebo upravený záznam se ignoruje) a **změna věku, přísnosti, hodnocení bez věku nebo minima hlasů ji zneplatní
+  hned**. Chyby (síť, časový limit, limit TMDb) se nikdy neukládají. Při vypnutém dětském režimu se nepoužívá vůbec.
 - **TMDb Helper sám věk nefiltruje.** Prohlížení v něm (jeho hledání, widgety, seznamy) zůstává dětem dostupné a
   zakázané tituly tam uvidí, jen se nepřehrají. Doporučení: v dětském profilu skinu skrýt sekci Doplňky (video
   doplňky) nebo ji zamknout, ať se dítě k TMDb Helperu vůbec nedostane. Zámek nastavení Kodi, profilu, rodičovskou kontrolu a skrytí položek v

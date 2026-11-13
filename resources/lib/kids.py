@@ -5,6 +5,7 @@ mapped to a minimum age. The strictest rating decides; only when it is below 16 
 a percentile (setting) may discard stray strict outliers. A rating of 16+ is never discarded, and a rating of a
 country outside the table that clearly reads as 16+ (18+, R18+, 19, X ...) rejects the title too.
 """
+import hashlib
 import math
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +14,9 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 IMAGE_URL = "https://image.tmdb.org/t/p/w500"
 MIN_AGE, MAX_AGE = 3, 18
+# Version of the decision logic (evaluate / evaluate_playback). Bump it with every change of the logic that is not
+# visible in the tables below: it invalidates the in-memory caches of verdicts and search results (kids_memo.py).
+CACHE_VERSION = 2  # 2: search records carry the summary of the hidden titles
 # Horror, Thriller, Crime, War, Mystery, War & Politics
 _STRONG_GENRES = frozenset({27, 53, 80, 10752, 9648, 10768})
 _MILD_GENRES = frozenset({27, 10752})  # Horror, War
@@ -23,7 +27,7 @@ class KidsConfig:
     age: int = 8
     unrated: str = "deny"  # "deny" | "allow"
     min_votes: int = 20  # setting kids_min_votes
-    percentile: int = 75  # setting kids_percentile: 50 (median) .. 100 (strictest country decides)
+    percentile: int = 50  # setting kids_percentile: 50 (median) .. 100 (strictest country decides)
     sort: str = "relevance"  # setting kids_sort: relevance (TMDb order) | popularity | rating | year
     limit: int = 20  # setting kids_limit: the most titles listed
 
@@ -77,6 +81,18 @@ def config_from_settings(get_setting: Callable[[str], str]) -> KidsConfig:
     return KidsConfig(age=age, unrated=unrated, min_votes=min_votes, percentile=percentile, sort=sort, limit=limit)
 
 
+def algorithm_digest() -> str:
+    """Short digest of everything the decision depends on besides the settings (age table, genre lists, constants).
+    Part of the cache fingerprint, so an edited table drops the cached verdicts even when CACHE_VERSION was not bumped."""
+    parts = [
+        repr(sorted((country, sorted(table.items())) for country, table in AGE_TABLE.items())),
+        repr(sorted(_STRONG_GENRES)), repr(sorted(_MILD_GENRES)),
+        repr(sorted(_NO_RATING)), repr(sorted((c, sorted(v)) for c, v in _NO_RATING_BY_COUNTRY.items())),
+        repr(sorted(_ADULT_WORDS)), repr((MIN_AGE, MAX_AGE, MIN_COUNTRIES_FOR_PERCENTILE)),
+    ]
+    return hashlib.sha256("".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
 def _log(message):
     """Logs to the Kodi log when available, else to stdlib logging. Callers must not pass secrets (API key, URLs)."""
     try:
@@ -100,7 +116,7 @@ def _number(value, default=0.0) -> float:
 
 AGE_TABLE: Dict[str, Dict[str, int]] = {
     "CZ": {"U": 0, "G": 0, "0+": 0, "5+": 5, "6+": 6, "7+": 7, "9+": 9, "12+": 12, "15+": 15, "18+": 18,
-           "0": 0, "12": 12, "15": 15, "18": 18},
+           "0": 0, "12": 12, "15": 15, "18": 18, "PG-13": 13},
     "SK": {"U": 0, "7": 7, "12": 12, "15": 15, "18": 18},
     "DE": {"0": 0, "6": 6, "12": 12, "16": 16, "18": 18},
     "AT": {"AA": 0, "0": 0, "6": 6, "8": 8, "10": 10, "12": 12, "14": 14, "16": 16},
@@ -357,10 +373,58 @@ def _sort_key(cfg: KidsConfig, item, rank=(0, 0)):
     return (-popularity,)
 
 
-def search_safe(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, workers=6) -> List[Dict]:
+# Verdicts that hide a title because of its age rating (not because of its genre, votes or an adult flag)
+HIDDEN_BY_AGE = "age too high"
+HIDDEN_UNRATED = frozenset({"unrated", "unplaced rating"})
+
+
+def empty_hidden() -> Dict[str, int]:
+    return {"high": 0, "unrated": 0, "min_age": 0}
+
+
+def hidden_total(hidden) -> int:
+    """How many titles the summary counts (0 for None or anything that is not a summary)."""
+    try:
+        return max(0, int(hidden["high"])) + max(0, int(hidden["unrated"]))
+    except (TypeError, KeyError, ValueError):
+        return 0
+
+
+def summarise_hidden(verdicts) -> Dict[str, int]:
+    """Summary of the titles hidden because of their age rating: "high" = rated above the age (min_age = the lowest
+    age that would let one through), "unrated" = no rating or one that cannot be placed. Counts only, no titles."""
+    summary = empty_hidden()
+    ages = []
+    for verdict in verdicts:
+        if verdict.reason == HIDDEN_BY_AGE:
+            summary["high"] += 1
+            if verdict.age is not None:
+                ages.append(verdict.age)
+        elif verdict.reason in HIDDEN_UNRATED:
+            summary["unrated"] += 1
+    summary["min_age"] = min(ages) if ages else 0
+    return summary
+
+
+def search_safe(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, workers=6,
+                on_allowed=None, report=None) -> List[Dict]:
     """Searches TMDb and keeps only titles that pass evaluate(); any failing details call drops the title.
-    limit and pages default to cfg.limit and a number of pages that can fill it."""
-    return _search(tmdb, query, kinds, cfg, limit, pages, workers, filtered=True)
+    limit and pages default to cfg.limit and a number of pages that can fill it.
+    on_allowed(kind, tmdb_id, verdict) is called (in the calling thread, after the details are in) for every title
+    evaluate() allowed, listed or not; a failing callback is only logged.
+    report, when a dict, gets "failures": the number of failed or dropped-by-error calls (0 = the result is complete)
+    and "hidden" (see search_report). A thin wrapper of search_report."""
+    return search_report(tmdb, query, kinds, cfg, limit, pages, workers, on_allowed, report)[0]
+
+
+def search_report(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, workers=6,
+                  on_allowed=None, report=None) -> Tuple[List[Dict], Dict[str, int]]:
+    """search_safe plus a summary of what the age rating hid: (results, {"high": n, "unrated": m, "min_age": a}).
+    Only titles that passed the cheap pre-filter (adult, genre, votes) and were then refused by evaluate() because
+    of their age or rating are counted; no titles or names are kept. Titles lost to an error are not counted."""
+    report = report if report is not None else {}
+    results = _search(tmdb, query, kinds, cfg, limit, pages, workers, filtered=True, on_allowed=on_allowed, report=report)
+    return results, report.get("hidden") or empty_hidden()
 
 
 def search_all(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, workers=6) -> List[Dict]:
@@ -369,7 +433,10 @@ def search_all(tmdb, query, kinds, cfg: KidsConfig, limit=None, pages=None, work
     return _search(tmdb, query, kinds, cfg, limit, pages, workers, filtered=False)
 
 
-def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered) -> List[Dict]:
+def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered, on_allowed=None, report=None) -> List[Dict]:
+    if report is not None:
+        report["failures"] = 0
+        report["hidden"] = empty_hidden()
     if limit is None:
         limit = cfg.limit
     if pages is None:
@@ -400,6 +467,8 @@ def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered
         return []
 
     errors = []  # exceptions of the details calls (list.append is thread safe)
+    allowed = []  # (kind, id, verdict) of every title evaluate() allowed
+    refused = []  # verdicts of the titles evaluate() refused (only their reasons are used, see summarise_hidden)
 
     def check(candidate):
         kind, item, _rank = candidate
@@ -412,17 +481,32 @@ def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered
             # type only, no str(exc): the message of an HTTP error may carry the request URL with the key
             _log(f"kids: details of {kind}:{item.get('id')} failed, title dropped: {type(exc).__name__}")
             return None  # fail closed
-        return verdict if verdict.allowed else None
+        if verdict.allowed:
+            allowed.append((kind, item["id"], verdict))
+            return verdict
+        refused.append(verdict)
+        return None
 
     with ThreadPoolExecutor(max_workers=max(1, min(workers, len(candidates)))) as pool:
         verdicts = list(pool.map(check, candidates))
     if errors and len(errors) == len(candidates):
         raise errors[0]  # every details call failed: a network/auth problem, not "nothing suitable"
+    if report is not None:
+        report["failures"] = len(errors)
+        report["hidden"] = summarise_hidden(refused)
+    if on_allowed is not None:
+        for kind, tmdb_id, verdict in allowed:
+            try:
+                on_allowed(kind, tmdb_id, verdict)
+            except Exception as exc:  # a callback (a cache) never breaks the search
+                _log(f"kids: on_allowed failed: {type(exc).__name__}")
     ranked = sorted(((_sort_key(cfg, candidates[i][1], candidates[i][2]), i) for i, v in enumerate(verdicts) if v),
                     key=lambda t: t)
     chosen = [i for _, i in ranked][:max(limit, 0)]
     if not chosen:
         return []
+
+    build_failures = []  # titles listed without posters or dropped: the result is incomplete
 
     def build(i):
         kind, item, _rank = candidates[i]
@@ -430,11 +514,16 @@ def _search(tmdb, query, kinds, cfg: KidsConfig, limit, pages, workers, filtered
             extras = tmdb.details_extras(kind, item["id"])
         except Exception:
             extras = None
+            build_failures.append(i)
         try:
             return _to_entry(kind, item, verdicts[i], extras)
         except Exception as exc:  # a malformed item drops only itself
+            build_failures.append(i)
             _log(f"kids: {kind}:{item.get('id')} could not be built: {type(exc).__name__}")
             return None
 
     with ThreadPoolExecutor(max_workers=max(1, min(workers, len(chosen)))) as pool:
-        return [entry for entry in pool.map(build, chosen) if entry]
+        entries = [entry for entry in pool.map(build, chosen) if entry]
+    if report is not None:
+        report["failures"] += len(build_failures)
+    return entries

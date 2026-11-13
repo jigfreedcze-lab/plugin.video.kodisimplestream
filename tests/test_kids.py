@@ -76,11 +76,13 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(order("year"), [2, 3, 1, 4])
 
     def test_percentile_config(self):
-        self.assertEqual(self.cfg().percentile, 75)
+        self.assertEqual(self.cfg().percentile, 50)  # the default strictness is the median
+        self.assertEqual(KidsConfig().percentile, 50)
         self.assertEqual(self.cfg(kids_percentile="90").percentile, 90)
         self.assertEqual(self.cfg(kids_percentile="10").percentile, 50)
         self.assertEqual(self.cfg(kids_percentile="500").percentile, 100)
-        self.assertEqual(self.cfg(kids_percentile="x").percentile, 75)
+        self.assertEqual(self.cfg(kids_percentile="x").percentile, 50)
+        self.assertEqual(self.cfg(kids_percentile="").percentile, 50)
 
     def test_min_votes(self):
         self.assertEqual(self.cfg(kids_min_votes="5").min_votes, 5)
@@ -151,7 +153,7 @@ class TableTests(unittest.TestCase):
             ("movie", "DE", "16", 16), ("movie", "DE", "18", 18),
             ("movie", "AT", "AA", 0), ("movie", "AT", "8", 8), ("tv", "AT", "14", 14),
             ("movie", "CH", "0", 0), ("movie", "CH", "10", 10), ("movie", "CH", "18", 18),
-            ("movie", "US", "G", 0), ("movie", "US", "PG", 8), ("movie", "US", "PG-13", 13),
+            ("movie", "CZ", "PG-13", 13), ("movie", "US", "G", 0), ("movie", "US", "PG", 8), ("movie", "US", "PG-13", 13),
             ("movie", "US", "R", 17), ("movie", "US", "NC-17", 18),
             ("tv", "US", "TV-Y", 0), ("tv", "US", "TV-Y7", 7), ("tv", "US", "TV-G", 0), ("tv", "US", "TV-PG", 8),
             ("tv", "US", "TV-14", 14), ("tv", "US", "TV-MA", 17),
@@ -283,7 +285,7 @@ class EvaluateTests(unittest.TestCase):
               "NL": ["AL"], "AT": ["0"], "IT": ["T"], "CH": ["12"], "HU": ["12"]}
 
     def test_outlier_countries_ignored_with_many_countries(self):
-        verdict = self.ev(movie(self.FAMILY), age=8)  # default percentile 75: CH 12 and HU 12 do not decide
+        verdict = self.ev(movie(self.FAMILY), age=8)  # default percentile 50: CH 12 and HU 12 do not decide
         self.assertTrue(verdict.allowed, verdict)
         self.assertEqual(verdict.age, 0)
         # ...but a 16+ rating is never an outlier: it decides whatever the other countries say
@@ -596,6 +598,91 @@ class SearchRobustnessTests(unittest.TestCase):
             kids._log = original
         # nothing suitable (as opposed to a failure) is still an empty list
         self.assertEqual(search_safe(FakeTmdb(self.searches, self.details), "q", ("movie",), KidsConfig(age=12, min_votes=10 ** 6)), [])
+
+
+class SearchReportTests(unittest.TestCase):
+    """search_report: the same search plus a summary of the titles hidden because of their age rating."""
+    CFG = KidsConfig(age=8, sort="popularity")
+
+    def setUp(self):
+        self.searches = {("movie", 1): [
+            sr(1, 90), sr(2, 80), sr(3, 70), sr(4, 60), sr(5, 50),
+            sr(6, 40, genre_ids=[27]),             # pre-filter: blocked genre
+            sr(7, 30, vote_count=1),               # pre-filter: few votes
+            sr(8, 20, adult=True),                 # pre-filter: adult
+            sr(9, 15),                             # details: a blocked genre
+            sr(10, 14),                            # details: few votes
+            sr(11, 13)]}                           # details: age too high AND a blocked genre
+        self.details = {
+            ("movie", 1): movie({"CZ": ["U"]}),
+            ("movie", 2): movie({"CZ": ["15+"]}),
+            ("movie", 3): movie({"CZ": ["18+"]}),
+            ("movie", 4): movie({}),               # unrated
+            ("movie", 5): movie({"DE": ["99"]}),   # a rating that cannot be placed
+            ("movie", 9): movie({"CZ": ["U"]}, genres=(27,)),
+            ("movie", 10): movie({"CZ": ["18+"]}, vote_count=3),
+            ("movie", 11): movie({"CZ": ["18+"]}, genres=(27,))}
+
+    def run_report(self, cfg=None, **kw):
+        tmdb = FakeTmdb(self.searches, self.details)
+        return kids.search_report(tmdb, "q", ("movie",), cfg or self.CFG, **kw)
+
+    def test_counts_only_age_and_rating_refusals(self):
+        results, hidden = self.run_report()
+        self.assertEqual([r["id"] for r in results], ["movie:1"])
+        # 2 above the age (15 and 18: the nearest is 15), 2 without a usable rating; genre, votes and adult do not count
+        self.assertEqual(hidden, {"high": 2, "unrated": 2, "min_age": 15})
+        self.assertEqual(kids.hidden_total(hidden), 4)
+
+    def test_summary_has_no_titles(self):
+        _, hidden = self.run_report()
+        self.assertEqual(set(hidden), {"high", "unrated", "min_age"})
+        self.assertTrue(all(isinstance(v, int) for v in hidden.values()), hidden)
+
+    def test_nothing_hidden(self):
+        results, hidden = self.run_report(KidsConfig(age=18, unrated="allow", sort="popularity"))
+        self.assertEqual(hidden, {"high": 0, "unrated": 1, "min_age": 0})  # only the unplaceable rating still hides
+        self.assertEqual(kids.hidden_total(kids.empty_hidden()), 0)
+        for details in self.details.values():
+            details["release_dates"] = {"results": []}
+        self.details[("movie", 5)] = movie({"CZ": ["U"]})
+        _, hidden = self.run_report(KidsConfig(age=18, unrated="allow", sort="popularity"))
+        self.assertEqual(hidden, kids.empty_hidden())
+        # no candidates at all
+        self.assertEqual(kids.search_report(FakeTmdb({}, {}), "q", ("movie",), self.CFG), ([], kids.empty_hidden()))
+
+    def test_unrated_allow_does_not_hide_unrated(self):
+        results, hidden = self.run_report(KidsConfig(age=8, unrated="allow", sort="popularity"))
+        self.assertIn("movie:4", [r["id"] for r in results])
+        self.assertEqual(hidden, {"high": 2, "unrated": 1, "min_age": 15})
+
+    def test_search_safe_stays_compatible(self):
+        results, hidden = self.run_report()
+        tmdb = FakeTmdb(self.searches, self.details)
+        plain = search_safe(tmdb, "q", ("movie",), self.CFG)
+        self.assertIsInstance(plain, list)
+        self.assertEqual(plain, results)
+        report = {}
+        self.assertEqual(search_safe(tmdb, "q", ("movie",), self.CFG, report=report), results)
+        self.assertEqual(report["hidden"], hidden)
+        self.assertIn("failures", report)  # (FakeTmdb has no details_extras, so poster failures count)
+        # the report dict of search_report gets the same
+        report = {}
+        self.run_report(report=report)
+        self.assertEqual(report["hidden"], hidden)
+
+    def test_kids_off_search_has_no_summary(self):
+        self.assertIsInstance(kids.search_all(FakeTmdb(self.searches, {}), "q", ("movie",), self.CFG), list)
+
+    def test_failed_details_are_not_counted_as_hidden(self):
+        tmdb = FakeTmdb(self.searches, self.details, failing=[("movie", 2)])
+        original = kids._log
+        kids._log = lambda message: None
+        try:
+            _, hidden = kids.search_report(tmdb, "q", ("movie",), self.CFG)
+        finally:
+            kids._log = original
+        self.assertEqual(hidden, {"high": 1, "unrated": 2, "min_age": 18})
 
 
 class SearchAllTests(unittest.TestCase):

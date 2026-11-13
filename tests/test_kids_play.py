@@ -42,6 +42,7 @@ sys.argv = ["plugin://plugin.video.kodisimplestream/", "1", ""]
 import kodisimplestream as k
 
 requests_made = []  # every TMDb call: (what, kind, id)
+timeouts = []  # the timeout each of them was given
 
 def movie(cert="PG", genres=(16,), votes=5):
     return {"genres": [{"id": g} for g in genres], "vote_count": votes,
@@ -54,14 +55,14 @@ def show(cert="TV-Y7", genres=(16,), votes=5):
 class FakeTmdb:
     data = {}  # (kind, id) -> details or Exception
     found = {}  # (imdb, kind) -> id
-    def details_with_ratings(self, kind, tmdb_id):
-        requests_made.append(("details", kind, tmdb_id))
+    def details_with_ratings(self, kind, tmdb_id, timeout=None):
+        requests_made.append(("details", kind, tmdb_id)); timeouts.append(timeout)
         value = self.data.get((kind, tmdb_id), RuntimeError("TMDb request failed"))
         if isinstance(value, Exception):
             raise value
         return value
-    def find_by_imdb(self, imdb, kind):
-        requests_made.append(("find", kind, imdb))
+    def find_by_imdb(self, imdb, kind, timeout=None):
+        requests_made.append(("find", kind, imdb)); timeouts.append(timeout)
         return self.found.get((imdb, kind))
 
 fake = FakeTmdb()
@@ -130,6 +131,11 @@ ev, lg, rq = run({"mediatype": "movie", "title": "F", "imdb_id": "tt1"})
 assert ev == PLAYS and rq == [("find", "movie", "tt1"), ("details", "movie", 10)], (ev, rq)
 ev, lg, rq = run(dict(EPISODE, tmdb_id="_", imdb_id="tt2"))
 assert ev == PLAYS and rq == [("find", "tv", "tt2"), ("details", "tv", 20)], (ev, rq)
+# the age check at playback uses the shorter playback timeout for both requests
+from resources.lib.tmdb import PLAYBACK_TIMEOUT
+timeouts.clear()
+ev, lg, rq = run({"mediatype": "movie", "title": "F", "imdb_id": "tt1"})
+assert len(rq) == 2 and timeouts == [PLAYBACK_TIMEOUT, PLAYBACK_TIMEOUT], timeouts
 # the TMDb id wins when both are there (one request)
 ev, lg, rq = run(dict(MOVIE, imdb_id="tt1")); assert rq == [("details", "movie", 10)], rq
 # unknown IMDb id, no id at all, a garbage id: refused (fail closed)
@@ -178,7 +184,7 @@ assert ev == ["english", "picker"] and rq == [], (ev, rq)
 from resources.lib import tmdb as tmdb_module
 real = tmdb_module.TMDB(KEY)
 paths = []
-def fake_get(path, **params):
+def fake_get(path, _timeout=None, **params):
     paths.append((path, params))
     return {"movie_results": [{"id": 7}], "tv_results": [], "tv_episode_results": [{"show_id": 9}]}
 real._get = fake_get

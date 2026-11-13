@@ -417,3 +417,35 @@ msgstr "The files found do not fit (another title, length or too high a bitrate)
 msgctxt "#30148"
 msgid "The files for this title are not available right now, try again later"
 msgstr "The files for this title are not available right now, try again later"
+
+msgctxt "#30149"
+msgid "{} title hidden (not suitable for age {})"
+msgstr "{} title hidden (not suitable for age {})"
+
+msgctxt "#30150"
+msgid "{} titles hidden (not suitable for age {})"
+msgstr "{} titles hidden (not suitable for age {})"
+
+msgctxt "#30151"
+msgid "{} titles hidden (not suitable for age {})"
+msgstr "{} titles hidden (not suitable for age {})"
+
+msgctxt "#30152"
+msgid "{}× higher age rating (closest from age {})"
+msgstr "{}× higher age rating (closest from age {})"
+
+msgctxt "#30153"
+msgid "{}× not rated"
+msgstr "{}× not rated"
+
+msgctxt "#30154"
+msgid "The age is set in the add-on settings."
+msgstr "The age is set in the add-on settings."
+
+msgctxt "#30155"
+msgid "No suitable titles found (hidden: {})"
+msgstr "No suitable titles found (hidden: {})"
+
+msgctxt "#30156"
+msgid "Show a row with the number of hidden titles (kids mode only)"
+msgstr "Show a row with the number of hidden titles (kids mode only)"

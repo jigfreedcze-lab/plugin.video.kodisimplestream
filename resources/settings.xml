@@ -30,8 +30,9 @@
         <setting label="30092" type="number" id="kids_age" default="8" />
         <setting label="30099" type="enum" id="kids_unrated" lvalues="30104|30105" default="0" />
         <setting label="30130" type="number" id="kids_min_votes" default="20" />
-        <setting label="30131" type="number" id="kids_percentile" default="75" />
+        <setting label="30131" type="number" id="kids_percentile" default="50" />
         <setting label="30132" type="enum" id="kids_sort" lvalues="30140|30133|30134|30135" default="0" />
         <setting label="30136" type="number" id="kids_limit" default="20" />
+        <setting label="30156" type="bool" id="kids_show_hidden" default="true" />
     </category>
 </settings>

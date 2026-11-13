@@ -84,7 +84,10 @@ def fake_search(tmdb, query, kinds, cfg, **kw):
     return fake_search.result
 fake_search.result = FOUND
 fake_search.name = "safe"
-k.kids.search_safe = fake_search
+fake_search.hidden = kids.empty_hidden()  # the summary of the titles the age hid
+def fake_report(tmdb, query, kinds, cfg, **kw):
+    return fake_search(tmdb, query, kinds, cfg, **kw), dict(fake_search.hidden)
+k.kids.search_report = fake_report  # the plugin searches with search_report (search_safe is its wrapper)
 def fake_all(tmdb, query, kinds, cfg, **kw):
     fake_search.name = "all"
     try:
@@ -268,6 +271,110 @@ items.clear(); k.router("action=kids_search&query=a")
 assert items and any(getattr(i[1], "context", None) and i[1].context[0][0] == "#30142" for i in items), "kids mode: Trakt context menu"
 
 
+# --- the grey row "N titles hidden" and its action ---
+STRINGS.update({30149: "Skryt {} titul (nevhodné pro věk {})", 30150: "Skryty {} tituly (nevhodné pro věk {})",
+                30151: "Skryto {} titulů (nevhodné pro věk {})", 30152: "{}× vyšší věkové hodnocení (nejblíže od {} let)",
+                30153: "{}× bez hodnocení", 30154: "Věk se mění v nastavení doplňku.",
+                30155: "Nenalezeny vhodné tituly (skrytých: {})"})
+PLUGIN = "plugin://plugin.video.kodisimplestream/"
+Addon.settings.update(kids_only="true")
+Addon.settings.pop("kids_show_hidden", None)
+for key in [key for key in Addon.settings if key.startswith("kids_") and key != "kids_only"]:
+    del Addon.settings[key]
+fake_search.result = FOUND
+def hidden_listing(hidden, handle=1):
+    fake_search.hidden = hidden
+    k._handle = handle
+    log.clear(); items.clear(); updates.clear()
+    k.router("action=kids_search&query=princ")
+    k._handle = 1
+    return list(items)
+# 2 above the age + 1 without a rating: the row is the last item, a script item with counts only in its URL
+listing = hidden_listing({"high": 2, "unrated": 1, "min_age": 12})
+assert len(listing) == 4 and listing[0][1].label == "#30126", listing
+url, row, is_folder = listing[-1]
+assert url == PLUGIN + "?action=kids_hidden&high=2&unrated=1&age=12" and is_folder is False, url
+assert row.label == "[COLOR gray]Skryty 3 tituly (nevhodné pro věk 8)[/COLOR]", row.label
+assert "IsPlayable" not in row.props and row.props == {} and row.info == {} and not hasattr(row, "context"), (row.props, row.info)
+assert not any(key in row.art for key in ("poster", "fanart")), row.art
+assert not any(word in url + row.label for word in ("princ", "Malý", "Méďové", "query", "tmdb", "movie:", "tv:")), (url, row.label)
+assert log == [("end", True)], log
+# Czech plural of the label: 1 / 2 to 4 / 5 and more
+for hidden, text in (({"high": 1, "unrated": 0, "min_age": 10}, "Skryt 1 titul"), ({"high": 0, "unrated": 4, "min_age": 0}, "Skryty 4 tituly"),
+                     ({"high": 4, "unrated": 1, "min_age": 9}, "Skryto 5 titulů")):
+    assert hidden_listing(hidden)[-1][1].label == f"[COLOR gray]{text} (nevhodné pro věk 8)[/COLOR]", hidden
+# the age in the label is the age of the child from the settings
+Addon.settings["kids_age"] = "11"
+assert hidden_listing({"high": 1, "unrated": 0, "min_age": 12})[-1][1].label.endswith("věk 11)[/COLOR]")
+Addon.settings.pop("kids_age")
+# nothing hidden: no row; the setting off: no row; unset or on: row; kids mode off: no row, whatever the summary
+assert len(hidden_listing(kids.empty_hidden())) == 3
+Addon.settings["kids_show_hidden"] = "false"
+assert len(hidden_listing({"high": 2, "unrated": 1, "min_age": 12})) == 3
+Addon.settings["kids_show_hidden"] = "true"
+assert len(hidden_listing({"high": 2, "unrated": 1, "min_age": 12})) == 4
+Addon.settings.pop("kids_show_hidden")
+assert len(hidden_listing({"high": 2, "unrated": 1, "min_age": 12})) == 4  # on by default
+Addon.settings["kids_only"] = "false"
+assert len(hidden_listing({"high": 2, "unrated": 1, "min_age": 12})) == 3
+assert not any("kids_hidden" in i[0] for i in items), items
+Addon.settings["kids_only"] = "true"
+# the row has no context menu, not even Trakt, while the results keep theirs
+listing = hidden_listing({"high": 2, "unrated": 1, "min_age": 12})
+assert [hasattr(i[1], "context") for i in listing] == [False, True, True, False], listing
+# no results, something hidden: the message carries the number; with the row off or nothing hidden it is the old one
+fake_search.result = []
+listing = hidden_listing({"high": 2, "unrated": 1, "min_age": 12})
+assert log == [("notif", "Nenalezeny vhodné tituly (skrytých: 3)"), ("end", True)], log
+assert [i[1].label for i in listing] == ["#30126", "[COLOR gray]Skryty 3 tituly (nevhodné pro věk 8)[/COLOR]"] and [i[2] for i in listing] == [False, False], listing
+listing = hidden_listing(kids.empty_hidden())
+assert log == [("notif", "#30109"), ("end", True)] and len(listing) == 1, (log, listing)
+Addon.settings["kids_show_hidden"] = "false"
+listing = hidden_listing({"high": 2, "unrated": 1, "min_age": 12})
+assert log == [("notif", "#30109"), ("end", True)] and len(listing) == 1, (log, listing)
+Addon.settings.pop("kids_show_hidden")
+# a failed search shows no summary of an earlier one
+fake_search.result = ConnectionError("síť")
+listing = hidden_listing({"high": 2, "unrated": 1, "min_age": 12})
+assert len(listing) == 1 and log[0][0] == "notif" and "skrytých" not in log[0][1], (log, listing)
+fake_search.result = FOUND
+fake_search.hidden = kids.empty_hidden()
+
+# the action: allowed in kids mode, a dialog with counts only (never a title or a query), the router sends nothing else
+assert "kids_hidden" in k._KIDS_ACTIONS
+k._handle = -1
+shown = []
+sys.modules["xbmc"].log = lambda msg, level=0: shown.append(msg)
+log.clear(); k.router("action=kids_hidden&high=2&unrated=1&age=12")
+assert log == [("ok", "2× vyšší věkové hodnocení (nejblíže od 12 let) · 1× bez hodnocení. Věk se mění v nastavení doplňku.")], log
+log.clear(); k.router("action=kids_hidden&high=1&unrated=0&age=10")
+assert log == [("ok", "1× vyšší věkové hodnocení (nejblíže od 10 let). Věk se mění v nastavení doplňku.")], log
+log.clear(); k.router("action=kids_hidden&high=0&unrated=3&age=0")
+assert log == [("ok", "3× bez hodnocení. Věk se mění v nastavení doplňku.")], log
+log.clear(); k.router("action=kids_hidden&high=0&unrated=0&age=0"); assert log == [], log  # nothing to say
+log.clear(); k.router("action=kids_hidden&high=abc&unrated=-4&age=x&query=Titul&tmdb_id=5"); assert log == [], log  # garbage is zero
+log.clear(); k.router("action=kids_hidden&unrated=99999"); assert log == [("ok", "9999× bez hodnocení. Věk se mění v nastavení doplňku.")], log
+log.clear(); k.router("action=kids_hidden"); assert log == []
+assert ("notif", "#30110") not in log
+# the log of the action has no title, query or id
+log.clear(); shown.clear(); k.router("action=kids_hidden&high=2&unrated=1&age=12&title=Secret+Title&query=princ")
+assert shown and all("Secret" not in m and "princ" not in m for m in shown) and all("Secret" not in str(e) for e in log), (shown, log)
+# called as a folder (an old favourite): the directory is closed as failed, the dialog still shows
+k._handle = 1
+log.clear(); k.router("action=kids_hidden&high=2&unrated=1&age=12")
+assert [e[0] for e in log] == ["ok", "end"] and log[1] == ("end", False), log
+# outside kids mode the action is refused: no dialog, nothing listed (not even the kids-mode refusal notification)
+Addon.settings["kids_only"] = "false"
+for handle in (-1, 1):
+    k._handle = handle
+    log.clear(); shown.clear(); k.router("action=kids_hidden&high=2&unrated=1&age=12")
+    assert [e for e in log if e[0] in ("ok", "notif")] == [] and log == ([] if handle < 0 else [("end", False)]), (handle, log)
+    assert any("refused" in m for m in shown), shown
+k._handle = 1
+sys.modules["xbmc"].log = lambda msg, level=0: None
+Addon.settings["kids_only"] = "true"
+print("kids hidden row: checks passed")
+
 # off: the Webshare search works and the root menu is the normal one with the kids entry
 Addon.settings["kids_only"] = "false"
 k.search_webshare = lambda: allowed.append(("search_webshare",))
@@ -367,19 +474,24 @@ assert (cs & en) == cs | en, "both .po files have the same ids"
 ids = [s.get("id") for s in ET.parse(os.path.join(REPO, "resources", "settings.xml")).iter("setting") if s.get("id")]
 assert len(ids) == len(set(ids)), ids
 kids_ids = sorted(i for i in ids if i.startswith("kids_"))
-assert kids_ids == ["kids_age", "kids_limit", "kids_min_votes", "kids_only", "kids_percentile", "kids_sort", "kids_unrated"], kids_ids
+assert kids_ids == ["kids_age", "kids_limit", "kids_min_votes", "kids_only", "kids_percentile", "kids_show_hidden", "kids_sort",
+                    "kids_unrated"], kids_ids
 assert "tmdbh_no_picker" in ids
 settings_root = ET.parse(os.path.join(REPO, "resources", "settings.xml")).getroot()
 age = settings_root.find(".//setting[@id='kids_age']")
 assert age.get("type") == "number" and age.get("default") == "8", age.attrib
 unrated = settings_root.find(".//setting[@id='kids_unrated']")
 assert unrated.get("type") == "enum" and unrated.get("default") == "0" and unrated.get("lvalues") == "30104|30105", unrated.attrib
+assert settings_root.find(".//setting[@id='kids_percentile']").get("default") == "50"  # the default strictness: the median
+hidden_setting = settings_root.find(".//setting[@id='kids_show_hidden']")
+assert hidden_setting.get("type") == "bool" and hidden_setting.get("default") == "true", hidden_setting.attrib
 actions = [s for s in settings_root.iter("setting") if s.get("type") == "action"]
 assert not actions, "the wizard button is gone"
 # every string a kids setting uses exists in both files; removed wizard strings left nothing behind
 for gone in (30093, 30094, 30095, 30096, 30097, 30100, 30103, 30106, 30112, 30113, 30114, 30115, 30116, 30117, 30118,
              30120, 30121, 30122, 30123, 30124, 30125, 30127, 30128, 30129):
     assert gone not in cs and gone not in en, gone
-assert {30090, 30091, 30092, 30099, 30104, 30105, 30108, 30109, 30110, 30111, 30126, 30130, 30131, 30132, 30133, 30134, 30135, 30136, 30137, 30138, 30139, 30140, 30142} <= cs & en
+assert {30090, 30091, 30092, 30099, 30104, 30105, 30108, 30109, 30110, 30111, 30126, 30130, 30131, 30132, 30133, 30134, 30135, 30136, 30137, 30138, 30139, 30140, 30142,
+       30149, 30150, 30151, 30152, 30153, 30154, 30155, 30156} <= cs & en
 assert "kids_configure" not in spec_source and "kids_cache" not in spec_source
 print("kids plugin: all checks passed")

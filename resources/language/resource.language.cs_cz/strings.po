@@ -417,3 +417,35 @@ msgstr "Nalezené soubory nevyhovují (jiný titul, délka nebo příliš velký
 msgctxt "#30148"
 msgid "The files for this title are not available right now, try again later"
 msgstr "Soubory k tomuto titulu jsou právě nedostupné, zkuste to později"
+
+msgctxt "#30149"
+msgid "{} title hidden (not suitable for age {})"
+msgstr "Skryt {} titul (nevhodné pro věk {})"
+
+msgctxt "#30150"
+msgid "{} titles hidden (not suitable for age {})"
+msgstr "Skryty {} tituly (nevhodné pro věk {})"
+
+msgctxt "#30151"
+msgid "{} titles hidden (not suitable for age {})"
+msgstr "Skryto {} titulů (nevhodné pro věk {})"
+
+msgctxt "#30152"
+msgid "{}× higher age rating (closest from age {})"
+msgstr "{}× vyšší věkové hodnocení (nejblíže od {} let)"
+
+msgctxt "#30153"
+msgid "{}× not rated"
+msgstr "{}× bez hodnocení"
+
+msgctxt "#30154"
+msgid "The age is set in the add-on settings."
+msgstr "Věk se mění v nastavení doplňku."
+
+msgctxt "#30155"
+msgid "No suitable titles found (hidden: {})"
+msgstr "Nenalezeny žádné vhodné tituly (skrytých: {})"
+
+msgctxt "#30156"
+msgid "Show a row with the number of hidden titles (kids mode only)"
+msgstr "Ukázat řádek s počtem skrytých titulů (jen v dětském režimu)"

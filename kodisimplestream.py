@@ -24,9 +24,9 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 
-from resources.lib import file_details, kids, preview, source_ui
+from resources.lib import file_details, kids, kids_memo, preview, source_ui
 from resources.lib.webshare import WebshareAPI, WebshareError, WebshareStatusError
-from resources.lib.tmdb import TMDB, TMDBAuthError
+from resources.lib.tmdb import TMDB, TMDBAuthError, PLAYBACK_TIMEOUT
 from resources.lib.source_ui import (
     compact_label,
     language_tag,
@@ -699,6 +699,10 @@ def _flag(name: str) -> bool:
     """True when the boolean setting is on (Kodi returns "true"/"false" as text)."""
     return _addon.getSetting(name) == "true"
 
+def _flag_default_on(name: str) -> bool:
+    """A boolean setting that is on unless it is explicitly off (a value Kodi did not hand out counts as on)."""
+    return _addon.getSetting(name) != "false"
+
 def _add_kids_search_items() -> None:
     """The three kids search entries: everything, movies only, series only.
 
@@ -1138,6 +1142,15 @@ def _kids_config() -> kids.KidsConfig:
     """The age of the child and the policy for unrated titles (settings kids_age, kids_unrated)."""
     return kids.config_from_settings(_addon.getSetting)
 
+def _kids_memo() -> Optional[kids_memo.KidsMemo]:
+    """The in-memory signed cache of kids verdicts and searches (home window properties), None without a TMDb key
+    (it signs the records) or without a window. Callers use it in kids mode only."""
+    home = _home()
+    if home is None:
+        return None
+    cache = kids_memo.KidsMemo(_addon.getSetting("tmdb_api_key").strip(), home.getProperty, home.setProperty)
+    return cache if cache.enabled else None
+
 def kids_item_path(result: Dict[str, Any]) -> Tuple[str, bool]:
     """TMDb Helper path of a kids search result and whether it is a folder (a series opens its seasons, a movie plays)."""
     tmdb_id = str(result["id"]).partition(":")[2] or str(result["id"])
@@ -1145,8 +1158,48 @@ def kids_item_path(result: Dict[str, Any]) -> Tuple[str, bool]:
         return f"{TMDBH_URL}?info=play&tmdb_type=movie&tmdb_id={tmdb_id}", False
     return f"{TMDBH_URL}?info=seasons&tmdb_type=tv&tmdb_id={tmdb_id}", True
 
-def list_kids_results(results: List[Dict[str, Any]], kind: str = "both", replace: bool = False) -> None:
-    """Lists the allowed titles under a "New search" entry (a search from the results, no way back needed)."""
+def _shown_hidden(hidden: Optional[Dict[str, int]]) -> Optional[Dict[str, int]]:
+    """The summary of the titles the age hid, when the row about it is to be shown: kids mode, setting
+    kids_show_hidden on (the default) and at least one title hidden. None otherwise."""
+    if not hidden or not _flag("kids_only") or not _flag_default_on("kids_show_hidden"):
+        return None
+    return hidden if kids.hidden_total(hidden) > 0 else None
+
+def _add_hidden_item(hidden: Dict[str, int]) -> None:
+    """The grey row "N titles hidden (not suitable for age X)" at the end of the kids results. A script item (like
+    "New search"): neither a folder nor playable, no poster, plot, media type or context menu. Its URL carries counts
+    only, never a title, a query or an id; a click shows a dialog (kids_hidden)."""
+    total = kids.hidden_total(hidden)
+    string_id = 30149 if total == 1 else (30150 if 2 <= total <= 4 else 30151)  # Czech plural: 1 / 2-4 / 0 and 5+
+    label = _addon.getLocalizedString(string_id).format(total, _kids_config().age)
+    item = xbmcgui.ListItem(label=f"[COLOR gray]{label}[/COLOR]")
+    item.setArt({"icon": "DefaultIconInfo.png", "thumb": "DefaultIconInfo.png"})
+    url = get_url(action="kids_hidden", high=hidden["high"], unrated=hidden["unrated"], age=hidden["min_age"])
+    xbmcplugin.addDirectoryItem(_handle, url, item, isFolder=False)
+
+def kids_hidden(params: Dict[str, str]) -> None:
+    """Click on the row of hidden titles: a dialog with the counts (no titles) and where the age is changed.
+    The counts come from the URL of the row; nothing else is read or looked up."""
+    def count(name: str) -> int:
+        value = _int_param(params, name)
+        return max(0, min(9999, value)) if value is not None else 0
+    high, unrated, age = count("high"), count("unrated"), count("age")
+    parts = []
+    if high:
+        parts.append(_addon.getLocalizedString(30152).format(high, age))
+    if unrated:
+        parts.append(_addon.getLocalizedString(30153).format(unrated))
+    if parts:
+        xbmcgui.Dialog().ok(_addon.getAddonInfo("name"),
+                            " · ".join(parts) + ". " + _addon.getLocalizedString(30154))
+    xbmc.log(f"[KodiSimpleStream] Kids: hidden titles info shown ({high + unrated})", xbmc.LOGINFO)
+    if _handle >= 0:  # called as a folder (an old favourite): there is no listing to show
+        xbmcplugin.endOfDirectory(_handle, succeeded=False)
+
+def list_kids_results(results: List[Dict[str, Any]], kind: str = "both", replace: bool = False,
+                      hidden: Optional[Dict[str, int]] = None) -> None:
+    """Lists the allowed titles under a "New search" entry (a search from the results, no way back needed),
+    and after them the row of the hidden titles (hidden: summary of kids.search_report, kids mode only)."""
     new_search = xbmcgui.ListItem(label=_addon.getLocalizedString(30126))  # "New search"
     new_search.setArt({"icon": "DefaultAddonsSearch.png", "thumb": "DefaultAddonsSearch.png"})
     search_url = get_url(action="kids_search", **({"type": kind} if kind in ("movie", "tv") else {}), replace=1)
@@ -1174,6 +1227,9 @@ def list_kids_results(results: List[Dict[str, Any]], kind: str = "both", replace
         item.addContextMenuItems([(_addon.getLocalizedString(30142),
                                    f"RunScript(plugin.video.themoviedb.helper,sync_trakt,tmdb_type={tmdb_type},tmdb_id={tmdb_id})")])
         xbmcplugin.addDirectoryItem(_handle, path, item, isFolder=is_folder)
+    shown = _shown_hidden(hidden)
+    if shown:
+        _add_hidden_item(shown)
     if replace:
         # A search started from the results takes their place in the history
         xbmcplugin.endOfDirectory(_handle, updateListing=True)
@@ -1220,24 +1276,39 @@ def kids_search(kind: str = "both", query: str = "", replace: bool = False) -> N
         xbmc.executebuiltin(f"Container.Update({get_url(**params)},replace)")
         return
     cfg = _kids_config()
+    started = time.monotonic()
+    kids_mode = _flag("kids_only")
+    cache = _kids_memo() if kids_mode else None  # kids mode off: nothing is read or remembered
+    cached = cache.get_search_report(query, kinds, cfg) if cache else None
+    results, hidden = cached if cached is not None else (None, None)
+    state = "off" if not kids_mode else ("hit" if results is not None else "miss")
     try:
-        # Kids mode on: only titles the age allows; off: everything TMDb finds
-        search = kids.search_safe if _flag("kids_only") else kids.search_all
-        results = search(tmdb, query, kinds, cfg)
+        if results is None:
+            # Kids mode on: only titles the age allows; off: everything TMDb finds
+            if kids_mode:
+                report: Dict[str, Any] = {}
+                results, hidden = kids.search_report(
+                    tmdb, query, kinds, cfg, report=report,
+                    # a title the search allowed is allowed at playback too (it only has the stricter votes rule)
+                    on_allowed=(lambda k, i, v: cache.put_verdict(k, i, cfg, v)) if cache else None)
+                if cache and report.get("failures") == 0:  # an incomplete result (an error dropped titles) is not kept
+                    cache.put_search(query, kinds, cfg, results, hidden)
+            else:
+                results = kids.search_all(tmdb, query, kinds, cfg)
     except Exception as exc:
         # No endOfDirectory(succeeded=False) here: for a URL with a query it could jump to the root of
         # the Videos window. Notify and show the usual list with just "New search", as for no results.
         show_tmdb_error(exc, close=False)
-        results = []
+        results, hidden = [], None
     else:
         if not results:
-            xbmcgui.Dialog().notification(
-                _addon.getAddonInfo("name"),
-                _addon.getLocalizedString(30109),  # "No suitable titles found"
-                xbmcgui.NOTIFICATION_INFO,
-                3000,
-            )
-    list_kids_results(results, kind, replace)
+            shown = _shown_hidden(hidden)
+            message = (_addon.getLocalizedString(30155).format(kids.hidden_total(shown)) if shown  # "... (hidden: N)"
+                       else _addon.getLocalizedString(30109))  # "No suitable titles found"
+            xbmcgui.Dialog().notification(_addon.getAddonInfo("name"), message, xbmcgui.NOTIFICATION_INFO, 3000)
+    xbmc.log(f"[KodiSimpleStream] kids_search timing: {time.monotonic() - started:.2f}s (cache {state}, "
+             f"hidden {kids.hidden_total(hidden)})", xbmc.LOGINFO)
+    list_kids_results(results, kind, replace, hidden)
 
 
 # tmdbh_prefer_quality -> preference of the resolutions in the name, for sources of an equal match.
@@ -1956,10 +2027,15 @@ def _add_english_title(params: Dict[str, Any]) -> None:
 _TV_MEDIATYPES = ("episode", "tvshow", "season", "tv", "series")
 
 
+# How the last age check at playback was decided ("cache": "hit" | "miss"), for the timing line of tmdbh_play
+_age_check_info: Dict[str, Any] = {}
+
+
 def _kids_playback_allowed(params: Dict[str, Any]) -> bool:
     """Kids mode: whether the title behind a TMDb Helper play call suits the child (age and genres, not the
     minimum of votes). A series is judged as a whole, not by the episode. Fails closed: no key, a network or
-    TMDb error, an unknown or missing id all refuse. Notifies about a refusal; the caller ends the resolve."""
+    TMDb error, an unknown or missing id all refuse. Notifies about a refusal; the caller ends the resolve.
+    A verdict is remembered in memory for a while (kids_memo), errors never; _age_check_info["cache"] tells which."""
     mediatype = str(params.get("mediatype") or "").lower()
     if mediatype != "movie" and mediatype not in _TV_MEDIATYPES:
         _kids_playback_refused(30143, "unknown mediatype")  # movie and tv id spaces overlap, so never guess
@@ -1974,14 +2050,21 @@ def _kids_playback_allowed(params: Dict[str, Any]) -> bool:
     if not tmdb:
         return False
     cfg = _kids_config()
+    cache = _kids_memo()
     try:
         if not tmdb_id.isdigit():
-            found = tmdb.find_by_imdb(imdb_id, kind)
+            found = tmdb.find_by_imdb(imdb_id, kind, timeout=PLAYBACK_TIMEOUT)
             if not found:
                 _kids_playback_refused(30143, "unknown title")
                 return False
             tmdb_id = str(found)
-        verdict = kids.evaluate_playback(kind, tmdb.details_with_ratings(kind, int(tmdb_id)), cfg)
+        verdict = cache.get_verdict(kind, tmdb_id, cfg) if cache else None
+        if cache is not None:  # without a cache nothing was read or written, so the line says "off"
+            _age_check_info["cache"] = "hit" if verdict is not None else "miss"
+        if verdict is None:
+            verdict = kids.evaluate_playback(kind, tmdb.details_with_ratings(kind, int(tmdb_id), timeout=PLAYBACK_TIMEOUT), cfg)
+            if cache:
+                cache.put_verdict(kind, tmdb_id, cfg, verdict)  # only a real verdict gets here: an error raised above
     except Exception as exc:
         show_tmdb_error(exc, close=False)
         xbmc.log(f"[KodiSimpleStream] Kids: playback refused, TMDb lookup failed: {type(exc).__name__}", xbmc.LOGWARNING)
@@ -2003,14 +2086,17 @@ def _kids_playback_refused(string_id: int, reason: str, age: Optional[int] = Non
 
 
 def tmdbh_play(params: Dict[str, Any]) -> None:
+    started = time.monotonic()
     # TMDb Helper fills keys it does not know with "_"
     params = {key: value for key, value in params.items() if value != "_"}
     # Kids mode: the very first thing, before any search, source, login or Up Next step. TMDb Helper (its own
     # search, widgets) does not filter by age, so the age of the title is checked here, at playback.
+    _age_check_info.clear()
     if _flag("kids_only") and not _kids_playback_allowed(params):
         if _handle >= 0:
             xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
+    age_seconds = time.monotonic() - started
     # The second player (docs/tmdbhelper/kodisimplestream_select.json) always opens the source picker,
     # only the exact value turns it on
     force_picker = params.pop("select", None) == "1"
@@ -2026,7 +2112,11 @@ def tmdbh_play(params: Dict[str, Any]) -> None:
         xbmcplugin.setResolvedUrl(_handle, False, xbmcgui.ListItem())
         return
 
+    english_started = time.monotonic()
     _add_english_title(params)
+    now = time.monotonic()
+    xbmc.log(f"[KodiSimpleStream] tmdbh_play timing: age={age_seconds:.2f}s (cache {_age_check_info.get('cache', 'off')}) "
+             f"english={now - english_started:.2f}s total={now - started:.2f}s before the source search", xbmc.LOGINFO)
     if force_picker and not no_picker:
         xbmc.log("[KodiSimpleStream] TMDbH source picker requested, auto-play skipped", xbmc.LOGINFO)
         select_tmdbh_source(params)
@@ -2083,7 +2173,7 @@ def _int_param(params: Dict[str, str], name: str) -> Optional[int]:
         return None
 
 # Actions that stay available in kids mode (kids_only): playback from TMDb Helper and the kids search
-_KIDS_ACTIONS = ("tmdbh_play", "kids_search", "kids_menu")
+_KIDS_ACTIONS = ("tmdbh_play", "kids_search", "kids_menu", "kids_hidden")
 _PLAYBACK_ACTIONS = ("play", "play_ident")
 
 def _refuse_kids_mode(action: str) -> None:
@@ -2149,6 +2239,13 @@ def router(paramstring: str) -> None:
         kids_menu()
     elif action == "kids_search":
         kids_search(params.get("type", "both"), params.get("query", ""), params.get("replace") == "1")
+    elif action == "kids_hidden":
+        if _flag("kids_only"):
+            kids_hidden(params)
+        else:  # the row exists only in kids mode: a stale or forged URL does nothing
+            xbmc.log("[KodiSimpleStream] kids_hidden refused: not in kids mode", xbmc.LOGINFO)
+            if _handle >= 0:
+                xbmcplugin.endOfDirectory(_handle, succeeded=False)
     elif action == "select_tmdb":
         handle_tmdb_selection(params["tmdb_id"], params["search_type"])
     elif action == "list_episodes":

@@ -1,11 +1,64 @@
+import http.cookiejar
+import re
+import threading
+import time
 import unicodedata
 from typing import Literal, Dict, List
 
 import requests
 
+# (connect, read) seconds. Searches and details of the kids filter run in parallel, one slow request must not hold the list
+TIMEOUT = (3.05, 8)
+# The age check before playback blocks the player, so it gives up sooner
+PLAYBACK_TIMEOUT = (3.05, 6)
+# One retry of HTTP 429 after Retry-After, capped so a rate limit never stalls the plugin
+RETRY_AFTER_DEFAULT = 1.0
+RETRY_AFTER_MAX = 2.0
+
 
 class TMDBAuthError(Exception):
     """TMDb rejected the API key (HTTP 401)."""
+
+
+class TMDBError(Exception):
+    """TMDb request failed (network error, timeout, HTTP error). The message never contains the API key."""
+
+
+def _log(message: str) -> None:
+    """Logs to the Kodi log when available, else to stdlib logging. Callers must not pass secrets (API key, URLs)."""
+    try:
+        import xbmc  # lazy: tmdb.py itself needs no Kodi
+        xbmc.log(f"[KodiSimpleStream] {message}", getattr(xbmc, "LOGWARNING", 2))
+    except ImportError:
+        import logging
+        logging.getLogger(__name__).warning(message)
+
+
+_session = None
+_session_lock = threading.Lock()
+
+
+def shared_session():
+    """
+    One keep-alive session per process, shared by the threads of the kids search (the TLS handshake of a new
+    connection per request took 2.5-9 s of the search). Separate from the Webshare session: no shared state,
+    no tokens. The API key travels in the request (query/header), never in the session.
+    """
+    global _session
+    with _session_lock:
+        if _session is None:
+            session = requests.Session()
+            # No cookies needed; an unchanged jar lets the threads share the session (requests iterates it unlocked)
+            session.cookies.set_policy(http.cookiejar.DefaultCookiePolicy(allowed_domains=[]))
+            try:
+                # requests < 2.32 loads the CA bundle for each new connection; share one SSL context like Webshare does
+                from resources.lib.webshare import _shared_context_adapter
+                if getattr(requests.adapters, "_preloaded_ssl_context", None) is None:
+                    session.mount("https://", _shared_context_adapter())
+            except Exception:
+                pass  # only a speed-up
+            _session = session
+        return _session
 
 
 class TMDB:
@@ -18,7 +71,7 @@ class TMDB:
     BASE_URL = "https://api.themoviedb.org/3/"
     IMAGE_URL = "https://image.tmdb.org/t/p/w500"
 
-    def __init__(self, api_key: str, language: str = "cs-CZ", timeout: float = 15):
+    def __init__(self, api_key: str, language: str = "cs-CZ", timeout=None):
         # Users often copy the v4 token including the "Bearer " prefix
         parts = (api_key or "").split(None, 1)
         if parts and parts[0].lower() == "bearer":
@@ -28,11 +81,28 @@ class TMDB:
             raise ValueError("TMDb API key is not set")
         self._api_key = api_key
         self._language = language
-        self._timeout = timeout
+        # seconds or a (connect, read) tuple, TIMEOUT when not given
+        self._timeout = TIMEOUT if timeout is None else timeout
         # tv/{id} downloaded by get_detail() also contains seasons – reuse it in get_seasons()
         self._details: Dict[str, Dict] = {}
 
-    def _get(self, path: str, **params) -> Dict:
+    def _redact(self, text: str) -> str:
+        """requests puts the whole URL, with ?api_key=..., into connection errors."""
+        text = re.sub(r"(api_key=)[^&\s'\")]+", r"\g<1>***", text)
+        return text.replace(self._api_key, "***")
+
+    @staticmethod
+    def _retry_delay(response) -> float:
+        """Seconds to wait before the retry of a 429: Retry-After (number of seconds) within the cap, else the default."""
+        try:
+            value = float((getattr(response, "headers", None) or {}).get("Retry-After"))
+        except (TypeError, ValueError):
+            return RETRY_AFTER_DEFAULT  # missing, or an HTTP date
+        if value != value:  # NaN
+            return RETRY_AFTER_DEFAULT
+        return min(max(value, 0.0), RETRY_AFTER_MAX)
+
+    def _get(self, path: str, _timeout=None, **params) -> Dict:
         params.setdefault("language", self._language)
         headers = {"Accept": "application/json"}
         # v4 Read Access Token is a long JWT, v3 API key is 32 hex characters
@@ -40,11 +110,24 @@ class TMDB:
             headers["Authorization"] = f"Bearer {self._api_key}"
         else:
             params["api_key"] = self._api_key
-        response = requests.get(self.BASE_URL + path, params=params, headers=headers, timeout=self._timeout)
+        timeout = self._timeout if _timeout is None else _timeout
+        session = shared_session()
+        for attempt in (1, 2):
+            try:
+                response = session.get(self.BASE_URL + path, params=params, headers=headers, timeout=timeout)
+            except Exception as exc:
+                # No chaining: the traceback of the original error carries the URL with the key
+                raise TMDBError(f"TMDb request {path} failed ({type(exc).__name__}: {self._redact(str(exc))[:200]})") from None
+            if response.status_code == 429 and attempt == 1:
+                delay = self._retry_delay(response)
+                _log(f"TMDb rate limit (429) on {path.split('/')[0]}, retrying once in {delay:.1f} s")
+                time.sleep(delay)
+                continue  # the second 429 falls through to the error below, never a third attempt
+            break
         if response.status_code == 401:
             raise TMDBAuthError("TMDb rejected the API key")
         if response.status_code >= 400:
-            raise Exception(f"TMDb request {path} failed\nStatus code: {response.status_code}\nResponse: {response.text[:200]}")
+            raise TMDBError(self._redact(f"TMDb request {path} failed\nStatus code: {response.status_code}\nResponse: {response.text[:200]}"))
         return response.json()
 
     @staticmethod
@@ -164,19 +247,20 @@ class TMDB:
         data = self._get(f"search/{kind}", query=query, include_adult="false", page=page)
         return data.get("results", [])
 
-    def details_with_ratings(self, kind: str, tmdb_id) -> Dict:
-        """Details with certifications appended: release_dates (movie) or content_ratings (tv)."""
+    def details_with_ratings(self, kind: str, tmdb_id, timeout=None) -> Dict:
+        """Details with certifications appended: release_dates (movie) or content_ratings (tv).
+        timeout overrides the client's one (the age check before playback uses PLAYBACK_TIMEOUT)."""
         if kind not in ("movie", "tv"):
             raise ValueError(f"Invalid TMDb kind: {kind}")
         append = "release_dates" if kind == "movie" else "content_ratings"
-        return self._get(f"{kind}/{tmdb_id}", append_to_response=append)
+        return self._get(f"{kind}/{tmdb_id}", _timeout=timeout, append_to_response=append)
 
-    def find_by_imdb(self, imdb_id: str, kind: str):
+    def find_by_imdb(self, imdb_id: str, kind: str, timeout=None):
         """TMDb id (int) of the movie or series (kind "movie" | "tv") with this IMDb id, None when TMDb does not know it.
         For a series an episode IMDb id leads to the series too."""
         if kind not in ("movie", "tv"):
             raise ValueError(f"Invalid TMDb kind: {kind}")
-        data = self._get(f"find/{imdb_id}", external_source="imdb_id")
+        data = self._get(f"find/{imdb_id}", _timeout=timeout, external_source="imdb_id")
         if kind == "movie":
             found = (data.get("movie_results") or [{}])[0].get("id")
         else:
